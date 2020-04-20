@@ -134,7 +134,7 @@ class Bank:
             self.balance -= amount
 
         self._log(f"Branch {self.id}: {amount * Bank.money_unit[0]}{Bank.money_unit[1]} Transferred TO the branch "
-                  f"{receiver['id']}.")
+                  f"{receiver['id']}. (send_time:{result['send_time']})")
 
         return result
 

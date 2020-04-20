@@ -1,16 +1,13 @@
 import pickle
 import threading
 from threading import Thread
-from multiprocessing.pool import ThreadPool
 from datetime import datetime
-from time import sleep
-from multiprocessing import Pool
 import socket
+from multiprocessing import Pool
+from multiprocessing.pool import ThreadPool
 
 import numpy as np
 import matplotlib.pyplot as plt
-import socket
-from pathlib import Path
 
 from .commons import Bank, Constants
 
@@ -23,7 +20,9 @@ class Inspector:
         self.ports = np.arange(Bank.n_branches) + 11000
         self.branches = []
         self.received_messages = []
+        self.lock = threading.Lock()
 
+        self.log_database = Constants.dir_root / "inspector.log"
 
     def connect_to_branches(self):
         for i in Bank.n_branches:
@@ -36,8 +35,6 @@ class Inspector:
             self.branches[-1]["in_sock"].bind((self.address, 11000 + self.branches[-1]["id"]))
             self.branches[-1]["in_sock"].listen(1)
 
-        pass
-
     def get_messages(self, bid):
 
         self.branches[bid]["in_conn"], self.branches[bid]["address"] = self.branches[bid]["in_sock"].accept()
@@ -46,32 +43,52 @@ class Inspector:
             pickled_data = self.branches[bid]["in_conn"].recv(4096)
             message = pickle.loads(pickled_data)
 
-            if self.received_messages
+            if message["subject"] == "send":
+                self.received_messages.append(message)
+
+            elif message["subject"] == "receive":
+                send_message = self.find_transfer_message(message, remove=True)
+                if send_message:
+                    log_message = f'sender:{send_message["sender_id"]} ' \
+                                  f'- send_time:{send_message["send_time"]}' \
+                                  f'- amount:{send_message["amount"] * Bank.money_unit[0]}{Bank.money_unit[1]}' \
+                                  f'- receiver:{send_message["receiver_id"]}' \
+                                  f'- receive_time:{message["receive_time"]}'
+                    self._log(log_message)
+
+            elif message["subject"] == "global_snapshot":
 
 
-        pass
+                log_message = '============================================================\n' \
+                              'Global Snapshot:'
+                for snapshot in message["local_snapshots"]:
+                              log_message += f'\nBranch {snapshot["id"]}: ' \
+                                             f'Balance:{snapshot["balance"] * Bank.money_unit[0]}{Bank.money_unit[1]}' \
+                                             f'- In Channels: {snapshot["in_channels"] * Bank.money_unit[0]}' \
+                                             f'{Bank.money_unit[1]}'
+                log_message += '\n============================================================'
+
+                self._log(log_message)
 
     def find_transfer_message(self, message, remove=True):
 
-        lock = threading.Lock()
-        lock.acquire()
-        for i, recv_msg in self.received_messages:
-            if recv_msg["amount"] == message["amount"] and recv_msg["sender_id"] == message["receiver_id"] and recv_msg[
-                "receiver_id"] == message["sender_id"]:
+        self.lock.acquire()
+        send_message = False
+        for i, prev_message in self.received_messages:
+            if prev_message["amount"] == message["amount"] and \
+                            prev_message["sender_id"] == message["sender_id"] and \
+                            prev_message["receiver_id"] == message["receiver_id"]:
 
                 if remove:
-                    self.received_messages[i]:
-        lock.release()
+                    send_message = self.received_messages.pop(i)
+                else:
+                    send_message = self.received_messages[i]
 
+                self.lock.release()
+                return send_message
 
-
-    def show_transfers(self):
-
-        pass
-
-    def show_snapshots(self):
-
-        pass
+        self.lock.release()
+        return send_message
 
     def run(self):
 
@@ -82,3 +99,13 @@ class Inspector:
         for i in range(Bank.n_branches):
             threads[i].join()
 
+
+    def _log(self, message, stdio=True, in_file=False, file_mode="r+"):
+        prefix = datetime.now().strftime("%Y-%m-%d-%H-%M-%S ")
+
+        if stdio:
+            print(prefix + str(message))
+
+        if in_file:
+            with open(self.log_database, mode=file_mode) as f:
+                f.write(prefix + str(message))
