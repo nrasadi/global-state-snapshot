@@ -1,4 +1,3 @@
-
 import pickle
 import threading
 from threading import Thread
@@ -8,9 +7,7 @@ from time import sleep
 from multiprocessing import Pool
 import socket
 
-import matplotlib.pyplot as plt
 from pathlib import Path
-import json
 import numpy as np
 
 
@@ -62,7 +59,7 @@ class Bank:
         #     # TODO: I can't really remember what I was written here!!!
         #     pass
 
-        self.inspector = {"port": 10101, "address": "localhost", "conn": None}
+        self.inspector = {"port": 11000 + self.id, "address": "localhost", "conn": None}
         self._init_inspector()
         # Bank.branches_details.append({"id": self.id, "address": self.address, "port_base": self.port_base})
 
@@ -258,7 +255,7 @@ class Bank:
         :param sender_id: The id of sender information. The sender itself is a dictionary which its keys are same as the self.branch:
             [id:integer, "port": integer, "address": string,
             "in_sock": socket, "in_conn": input socket connection, "out_conn": output socket connection]
-        :return:
+        :return:s
         """
 
         sender = self.branches[sender_id]
@@ -312,23 +309,29 @@ class Bank:
 
         local, channels = self._do_snappy_things()
 
-        message = {
+        local_snapshot = {
+            "id": self.id,
             "subject": "snapshot",
             "own_balance": local,
             "on_the_fly": sum(channels)
         }
+        self.local_snapshots.append(local_snapshot)
 
-        self._create_global_snapshot(message)
+        self._create_global_snapshot()
 
-    def _create_global_snapshot(self, own_local_snapshot):
+    def _create_global_snapshot(self):
 
         while True:
             if len(self.local_snapshots) == Bank.n_branches - 1:
                 message = {
                     "subject": "global_snapshot",
-                    "d"
+                    "local_snapshots": [{"id": local["id"],
+                                         "balance": local["balance"],
+                                         "in_channels": local["on_the_fly"]}
+                                        for local in self.local_snapshots]
                 }
 
+                self._send_message(conn=self.inspector["conn"], message=message)
 
 
 
@@ -344,13 +347,14 @@ class Bank:
 
         local, channels = self._do_snappy_things(exclude_id=sender_id)
 
-        message = {
+        local_snapshot = {
+            "id": self.id,
             "subject": "snapshot",
-            "own_balance": local,
+            "balance": local,
             "on_the_fly": sum(channels)
         }
 
-        self._send_message(conn=self.branches[sender_id]["out_conn"], message=message)
+        self._send_message(conn=self.branches[sender_id]["out_conn"], message=local_snapshot)
 
     def _do_snappy_things(self, exclude_id=None):
 
@@ -457,46 +461,3 @@ class Bank:
         if in_file:
             with open(self.log_database, mode=file_mode) as f:
                 f.write(prefix + str(message))
-
-
-    def report(self, message, receiver):
-        """
-
-        :param message: contains: self.id, send_time, amount, receiver.id, receive_time
-        :param receiver:
-        :return:
-        """
-        # Connect to receiver
-        # if connection:
-        #   result = transfer(amount)
-        # if result == Successful:
-        #   send message to receiver
-
-
-    def snapshot(self):
-
-        # Record the Own Process State
-        own_balance = self.balance
-
-        # Send Marker Messages
-        for receiver in All_Receivers:
-            self._send_message(receiver, {"marker": True, "transfer": 0})
-
-        # Record Incoming Messages
-        # TODO: Listen to all incoming channels
-
-    def get_messages(self, sender_id):
-
-        # Listen to all channels
-
-        while True:
-            # now do something with the clientsocket
-            # in this case, we'll pretend this is a threaded server
-            ct = client_thread(clientsocket)
-            ct.run()
-
-        sleep(np.random.random(1, 11))
-
-
-
-        pass
