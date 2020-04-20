@@ -53,13 +53,15 @@ class Inspector:
 
     def find_transfer_message(self, message, remove=True):
 
+        lock = threading.Lock()
+        lock.acquire()
         for i, recv_msg in self.received_messages:
             if recv_msg["amount"] == message["amount"] and recv_msg["sender_id"] == message["receiver_id"] and recv_msg[
                 "receiver_id"] == message["sender_id"]:
 
                 if remove:
                     self.received_messages[i]:
-
+        lock.release()
 
 
 
