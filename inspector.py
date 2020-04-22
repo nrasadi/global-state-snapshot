@@ -52,10 +52,9 @@ class Inspector:
         bid = self._id_to_index(bid)
 
         self.branches[bid]["in_conn"], self.branches[bid]["address"] = self.branches[bid]["in_sock"].accept()
-        print("HELLO")
+
         while True:
             pickled_data = self.branches[bid]["in_conn"].recv(4096)
-            print("pickled_data: ", pickled_data)
             message = pickle.loads(pickled_data)
 
             if message["subject"] == "send":
@@ -89,7 +88,7 @@ class Inspector:
 
         self.lock.acquire()
         send_message = False
-        for i, prev_message in self.received_messages:
+        for i, prev_message in enumerate(self.received_messages):
             if prev_message["amount"] == message["amount"] and \
                             prev_message["sender_id"] == message["sender_id"] and \
                             prev_message["receiver_id"] == message["receiver_id"]:

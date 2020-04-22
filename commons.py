@@ -26,7 +26,7 @@ class Bank:
     bank_file = consts.dir_bank / "bank.json"
     money_unit = 1000, "Toomaan"
     time_unit = 0.5  # Seconds
-    n_branches = 2
+    n_branches = 4
     branches_public_details = []
     next_id = 0
 
@@ -160,6 +160,7 @@ class Bank:
                 break
             except:
                 continue
+        print(self.inspector)
         self._log("Connected to Inspector.")
 
     def transfer(self, amount: int, receiver, show_error: bool=False):
@@ -249,6 +250,7 @@ class Bank:
             "in_sock": socket, "in_conn": input socket connection, "out_conn": output socket connection]
         :return:
         """
+        receiver_id = self._id_to_index(receiver_id)
 
         receiver = self.branches[receiver_id]
 
@@ -313,6 +315,7 @@ class Bank:
             "in_sock": socket, "in_conn": input socket connection, "out_conn": output socket connection]
         :return:s
         """
+        sender_id = self._id_to_index(sender_id)
 
         sender = self.branches[sender_id]
 
@@ -397,8 +400,11 @@ class Bank:
 
         bidx = 0
         while True:
-            if self.branches[bidx]["last_message"]["subject"] == "marker" or self.do_snapshot:
-                sender_id = self.do_snapshot
+            print("self.branches: ", self.branches)
+            print("self.do_snapshot: ", self.do_snapshot)
+            input("STOP")
+            if (self.branches[bidx]["last_message"]["subject"] == "marker") or self.do_snapshot:
+                sender_id = self._id_to_index(self.do_snapshot)
                 self.do_snapshot = -1
                 break
             bidx = (bidx + 1) % Bank.n_branches
@@ -465,9 +471,15 @@ class Bank:
         for th in threads:
             th.join()
 
-        pool = Pool(2)
-        pool.apply_async(self.do_common)
-        pool.apply_async(self.snapshot_process)
+        t1 = Thread(target=self.do_common)
+        t2 = Thread(target=self.snapshot_process)
+        t1.start()
+        t2.start()
+        #
+        #
+        # pool = ThreadPool(2)
+        # pool.apply_async(self.do_common)
+        # pool.apply_async(self.snapshot_process)
 
     def _connect_to_branch(self, bid: int, mode: str):
         """

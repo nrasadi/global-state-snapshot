@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from commons import Bank
 from inspector import Inspector
@@ -14,11 +15,18 @@ if __name__ == '__main__':
                     help="Use this option to run an instance of Bank (a branch).")
     ap.add_argument("-i", "--inspector", required=False, action='store_true',
                     help="Use this option to run the inspector")
+    ap.add_argument("-c", "--clear", required=False, action='store_true',
+                    help="Clear the branches information file.")
 
     args = ap.parse_args()
 
+    if args.clear:
+        os.remove(str(Bank.bank_file))
+        print("Bank information file removed.")
+        exit(0)
+
     if args.bank and args.inspector:
-        raise "Use must use only one option."
+        raise "You must only use one option."
     elif args.bank:
         branch = Bank()
         branch.run()
