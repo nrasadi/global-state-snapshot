@@ -9,12 +9,12 @@ from multiprocessing.pool import ThreadPool
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .commons import Bank, Constants
+from commons import Bank, Constants
 
 
 class Inspector:
 
-    def __init__(self, address):
+    def __init__(self, address=None):
 
         self.address = "localhost" if address is None else address
         self.ports = np.arange(Bank.n_branches) + 11000
@@ -23,9 +23,21 @@ class Inspector:
         self.lock = threading.Lock()
 
         self.log_database = Constants.dir_root / "inspector.log"
+        self.log_database.mkdir(parents=True) if not self.log_database.is_dir() else None
+
+        self.connect_to_branches()
 
     def connect_to_branches(self):
-        for i in Bank.n_branches:
+
+        self._log("All branches are not started working yet. Waiting for the others ...")
+
+        while True:
+            Bank.load_class_vars()
+            if len(Bank.branches_public_details) == Bank.n_branches:
+                self._log(f"All {Bank.n_branches} branches are open now. Resuming the procedure ...")
+                break
+
+        for i in range(Bank.n_branches):
             self.branches.append({
                 "id": Bank.branches_public_details[i]["id"],
                 "address": Bank.branches_public_details[i]["address"],
@@ -37,10 +49,13 @@ class Inspector:
 
     def get_messages(self, bid):
 
-        self.branches[bid]["in_conn"], self.branches[bid]["address"] = self.branches[bid]["in_sock"].accept()
+        bid = self._id_to_index(bid)
 
+        self.branches[bid]["in_conn"], self.branches[bid]["address"] = self.branches[bid]["in_sock"].accept()
+        print("HELLO")
         while True:
             pickled_data = self.branches[bid]["in_conn"].recv(4096)
+            print("pickled_data: ", pickled_data)
             message = pickle.loads(pickled_data)
 
             if message["subject"] == "send":
@@ -93,8 +108,8 @@ class Inspector:
     def run(self):
 
         threads = []
-        for branch in self.branches:
-            threads.append(Thread(target=self.get_messages, args=(branch["id"], )))
+        for i in range(Bank.n_branches):
+            threads.append(Thread(target=self.get_messages, args=(i, )))
             threads[-1].start()
         for i in range(Bank.n_branches):
             threads[i].join()
@@ -109,3 +124,6 @@ class Inspector:
         if in_file:
             with open(self.log_database, mode=file_mode) as f:
                 f.write(prefix + str(message))
+
+    def _id_to_index(self, bid):
+        return [i for i, branch in enumerate(self.branches) if branch["id"]==bid][0]

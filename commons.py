@@ -9,27 +9,63 @@ import socket
 
 from pathlib import Path
 import numpy as np
+import json
 
 
 class Constants:
     dir_root = Path("logs/")
+    dir_bank = Path("bank/")
 
 
 class Bank:
 
+
     # Class Variables
-    next_id = 0
     consts = Constants()
+    consts.dir_bank.mkdir() if not consts.dir_bank.is_dir() else None
+    bank_file = consts.dir_bank / "bank.json"
     money_unit = 1000, "Toomaan"
-    time_unit = 0.5 # Seconds
-    n_branches = 4
+    time_unit = 0.5  # Seconds
+    n_branches = 2
     branches_public_details = []
+    next_id = 0
+
+    @classmethod
+    def load_class_vars(cls, ):
+
+        # input("Enter:")
+        while True:
+            try:
+                if not Bank.bank_file.is_file():
+                    Bank.next_id = 0
+                    Bank.branches_public_details = []
+                    return
+
+                # f = open(Bank.bank_file, "r")
+                # bank_vars = json.load(f)
+                with open(Bank.bank_file, "r") as f:
+                    temp = f.read()
+                bank_vars = json.loads(temp)
+
+                Bank.next_id = len(bank_vars["branch_details"])
+                Bank.branches_public_details = bank_vars["branch_details"]
+                return
+            except:
+                print("Error in loading bank file")
+                continue
+
+    @classmethod
+    def save_class_vars(cls, ):
+
+        with open(Bank.bank_file, "w") as f:
+            json.dump({"branch_details":Bank.branches_public_details}, f)
+
 
     def __init__(self, balance=None, address=None, port=None):
 
-        self.log_database = Bank.consts.dir_root / f"branch_{self.id}.log"
-
         self._log("Initiating ...")
+
+        Bank.load_class_vars()
 
         self.branches = []
         self.processes = []
@@ -37,19 +73,26 @@ class Bank:
         Bank.next_id += 1
         self.balance = 10000000 if balance is None else balance
 
+        Bank.consts.dir_root.mkdir() if not Bank.consts.dir_root.is_dir() else None
+        self.log_database = Bank.consts.dir_root / f"branch_{self.id}.log"
+        # self.log_database.mkdir(parents=True) if not self.log_database.is_dir() else None
+
         self._log(f"The branch {self.id} started working.", in_file=True, file_mode='w')
 
         self.do_snapshot = -1
         self.local_snapshots = []
 
         self.address = "localhost" if address is None else address
-        # out ports: 99[self.id][others]
-        #  in ports: 99[others][self.id]
         self.port_base = 9900 + self.id * 10 if port is None else port
 
         Bank.branches_public_details.append({"id": self.id, "address": self.address})
 
+        Bank.save_class_vars()
+
         self._init_other_branches()
+
+        self.inspector = {"port": 11000 + self.id, "address": "localhost", "conn": None}
+        self._init_inspector()
         # Create INET, Streaming sockets
         # self.out_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # Bind and Listen
@@ -59,8 +102,7 @@ class Bank:
         #     # TODO: I can't really remember what I was written here!!!
         #     pass
 
-        self.inspector = {"port": 11000 + self.id, "address": "localhost", "conn": None}
-        self._init_inspector()
+
         # Bank.branches_details.append({"id": self.id, "address": self.address, "port_base": self.port_base})
 
     def _init_other_branches(self):
@@ -79,7 +121,11 @@ class Bank:
         :return: None
         """
         self._log("Other branches are not started working yet. Waiting for the others ...")
+
         while True:
+            # input("Enter:")
+            Bank.load_class_vars()
+
             if len(Bank.branches_public_details) == Bank.n_branches:
                 self._log(f"All {Bank.n_branches} branches are open now. Resuming the procedure ...")
                 break
@@ -104,9 +150,17 @@ class Bank:
         Initiates the connection between this branch and the inspector
         :return:
         """
-        insp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        insp_sock.connect((self.inspector["address"], self.inspector["port"]))
-        self.inspector["conn"] = insp_sock
+        self._log("Connecting to Inspector ...")
+
+        while True:
+            try:
+                insp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                insp_sock.connect((self.inspector["address"], self.inspector["port"]))
+                self.inspector["conn"] = insp_sock
+                break
+            except:
+                continue
+        self._log("Connected to Inspector.")
 
     def transfer(self, amount: int, receiver, show_error: bool=False):
         """
@@ -172,6 +226,8 @@ class Bank:
         """
         # send = Thread(target=self._do_common_transfer)
         # send.start()
+
+        self._log("do_common")
 
         receive = []
         send = []
@@ -293,6 +349,8 @@ class Bank:
 
     def snapshot_process(self):
 
+        self._log("snapshot")
+
         t1 = Thread(target=self._init_snapshot)
         t2 = Thread(target=self._get_snapshot)
 
@@ -392,7 +450,6 @@ class Bank:
     def run(self):
 
         threads = []
-
         for branch in self.branches:
 
             # TODO: I may need to call servers before clients. I'm not sure.
@@ -419,6 +476,8 @@ class Bank:
         :param mode: mode of connection establishment. It can be "server" of "client"
         :return: None
         """
+
+        bid = self._id_to_index(bid)
 
         if mode == "server":
             self.branches[bid]["in_conn"], self.branches[bid]["address"] = self.branches[bid]["in_sock"].accept()
@@ -461,3 +520,6 @@ class Bank:
         if in_file:
             with open(self.log_database, mode=file_mode) as f:
                 f.write(prefix + str(message))
+
+    def _id_to_index(self, id):
+        return [i for i, branch in enumerate(self.branches) if branch["id"]==id][0]
