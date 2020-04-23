@@ -57,6 +57,8 @@ class Inspector:
             pickled_data = self.branches[bid]["in_conn"].recv(4096)
             message = pickle.loads(pickled_data)
 
+            # print("message:", message)
+
             if message["subject"] == "send":
                 self.received_messages.append(message)
 
@@ -64,23 +66,23 @@ class Inspector:
                 send_message = self.find_transfer_message(message, remove=True)
                 if send_message:
                     log_message = f'sender:{send_message["sender_id"]} ' \
-                                  f'- send_time:{send_message["send_time"]}' \
+                                  f'- send_time:{send_message["send_time"].strftime("%H:%M:%S ")}' \
                                   f'- amount:{send_message["amount"] * Bank.money_unit[0]}{Bank.money_unit[1]}' \
                                   f'- receiver:{send_message["receiver_id"]}' \
-                                  f'- receive_time:{message["receive_time"]}'
+                                  f'- receive_time:{message["receive_time"].strftime("%H:%M:%S ")}'
                     self._log(log_message)
 
             elif message["subject"] == "global_snapshot":
 
 
-                log_message = '============================================================\n' \
+                log_message = '\n============================================================\n' \
                               'Global Snapshot:'
                 for snapshot in message["local_snapshots"]:
                               log_message += f'\nBranch {snapshot["id"]}: ' \
                                              f'Balance:{snapshot["balance"] * Bank.money_unit[0]}{Bank.money_unit[1]}' \
                                              f'- In Channels: {snapshot["in_channels"] * Bank.money_unit[0]}' \
                                              f'{Bank.money_unit[1]}'
-                log_message += '\n============================================================'
+                log_message += '\n============================================================\n'
 
                 self._log(log_message)
 
@@ -115,7 +117,7 @@ class Inspector:
 
 
     def _log(self, message, stdio=True, in_file=False, file_mode="r+"):
-        prefix = datetime.now().strftime("%Y-%m-%d-%H-%M-%S ")
+        prefix = datetime.now().strftime("%Y-%m-%d:%H:%M:%S ")
 
         if stdio:
             print(prefix + str(message))

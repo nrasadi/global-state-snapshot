@@ -1,6 +1,7 @@
 import pickle
 import threading
 from threading import Thread
+from queue import Queue
 from multiprocessing.pool import ThreadPool
 from datetime import datetime
 from time import sleep
@@ -26,14 +27,14 @@ class Bank:
     bank_file = consts.dir_bank / "bank.json"
     money_unit = 1000, "Toomaan"
     time_unit = 0.5  # Seconds
-    n_branches = 4
+    n_branches = 2
     branches_public_details = []
     next_id = 0
 
     @classmethod
     def load_class_vars(cls, ):
 
-        # input("Enter:")
+
         while True:
             try:
                 if not Bank.bank_file.is_file():
@@ -81,6 +82,7 @@ class Bank:
 
         self.do_snapshot = -1
         self.local_snapshots = []
+        self.got_marker = False
 
         self.address = "localhost" if address is None else address
         self.port_base = 9900 + self.id * 10 if port is None else port
@@ -123,7 +125,6 @@ class Bank:
         self._log("Other branches are not started working yet. Waiting for the others ...")
 
         while True:
-            # input("Enter:")
             Bank.load_class_vars()
 
             if len(Bank.branches_public_details) == Bank.n_branches:
@@ -160,7 +161,7 @@ class Bank:
                 break
             except:
                 continue
-        print(self.inspector)
+
         self._log("Connected to Inspector.")
 
     def transfer(self, amount: int, receiver, show_error: bool=False):
@@ -233,11 +234,25 @@ class Bank:
         receive = []
         send = []
         for branch in self.branches:
-            receive.append(Thread(target=self._do_common_receive, args=(branch["id"], )))
-            receive[-1].start()
 
-            send.append(Thread(target=self._do_common_transfer, args=(branch["id"], )))
-            send[-1].start()
+            send.append(Thread(target=self._do_common_transfer, args=(branch["id"], ),
+                               name=f"common_transfer_to{branch['id']}_th"))
+
+            receive.append(Thread(target=self._do_common_receive, args=(branch["id"],),
+                                  name=f"common_receive_from{branch['id']}_th"))
+        for th in zip(receive, send):
+            th[0].start()
+            th[1].start()
+
+        # for rec in receive:
+        #     rec.join()
+        #
+        # for se in send:
+        #     se.join()
+
+
+
+
 
     def _do_common_transfer(self, receiver_id):
         """
@@ -254,7 +269,14 @@ class Bank:
 
         receiver = self.branches[receiver_id]
 
+        max_n_send = 5
+
         while True:
+
+            if max_n_send == 0:
+                print("Reached maximum number of sends")
+                return
+
             sleep(Bank.time_unit)
 
             if np.random.random() <= 0.3:
@@ -272,6 +294,8 @@ class Bank:
                     }
 
                     self._send_message(conn=self.inspector["conn"], message=message)
+
+                    max_n_send -= 1
 
         '''
         def _do_common_transfer(self):
@@ -315,38 +339,36 @@ class Bank:
             "in_sock": socket, "in_conn": input socket connection, "out_conn": output socket connection]
         :return:s
         """
-        sender_id = self._id_to_index(sender_id)
+        sender_index = self._id_to_index(sender_id)
 
-        sender = self.branches[sender_id]
+        sender = self.branches[sender_index]
 
         while True:
             pickled_data = sender["in_conn"].recv(4096)
             message = pickle.loads(pickled_data)
-
             # Add an intentional delay to simulate end-to-end connection latency.
-            sleep(Bank.time_unit * np.random.randint(1, 11))
+            # sleep(Bank.time_unit * np.random.randint(1, 11))
             recv_time = datetime.now()
             amount = 0
-
             if message["subject"].lower() == "transfer":
                 amount += message["amount"]
                 self.balance += amount
                 message_to_insp = {
                     "subject": "receive",
                     "amount": message["amount"],
-                    "sender_id": sender["id"],
-                    "receiver_id": self.id,
+                    "sender_id": self.id,
+                    "receiver_id": sender["id"],
                     "receive_time": recv_time
                 }
-
+                # print("received message: ", message)
                 self._send_message(conn=self.inspector["conn"], message=message_to_insp)
             elif message["subject"].lower() == "marker":
-                self.do_snapshot = sender_id
+                self.do_snapshot = sender_index
 
             elif message["subject"].lower() == "snapshot":
                 self.local_snapshots.append(message)
 
-            self.branches[sender_id]["last_message"] = {"recv_time": recv_time,
+            self.branches[sender_index]["last_message"] = {"recv_time": recv_time,
                                                          "amount": amount,
                                                          "subject": message["subject"]}
 
@@ -354,27 +376,37 @@ class Bank:
 
         self._log("snapshot")
 
-        t1 = Thread(target=self._init_snapshot)
-        t2 = Thread(target=self._get_snapshot)
+        t1 = Thread(target=self._init_snapshot, name="init_snapshot_th")
+        t2 = Thread(target=self._check_for_marker, name="check_for_marker_th")
 
         t1.start()
         t2.start()
 
+        # t1.join()
+        # t2.join()
+
     def _init_snapshot(self):
 
         while True:
-            do_snapshot = input()
+            do_snapshot = input("To get a snapshot-> Type 's' and Enter\n")
             if "s" in do_snapshot:
                 self._log("Initiating a snapshot.")
                 break
 
+        self.got_marker = True
         local, channels = self._do_snappy_things()
+        print("AFTER DO SNAPPY => local:",local," - channels:",channels)
+
+        try:
+            on_the_fly = sum(channels)
+        except TypeError:
+            on_the_fly = 0
 
         local_snapshot = {
             "id": self.id,
             "subject": "snapshot",
-            "own_balance": local,
-            "on_the_fly": sum(channels)
+            "balance": local,
+            "on_the_fly": on_the_fly
         }
         self.local_snapshots.append(local_snapshot)
 
@@ -382,34 +414,47 @@ class Bank:
 
     def _create_global_snapshot(self):
 
-        while True:
-            if len(self.local_snapshots) == Bank.n_branches - 1:
-                message = {
-                    "subject": "global_snapshot",
-                    "local_snapshots": [{"id": local["id"],
-                                         "balance": local["balance"],
-                                         "in_channels": local["on_the_fly"]}
-                                        for local in self.local_snapshots]
-                }
+        # while True:
+        if len(self.local_snapshots) == Bank.n_branches - 1:
+            message = {
+                "subject": "global_snapshot",
+                "local_snapshots": [{"id": local["id"],
+                                     "balance": local["balance"],
+                                     "in_channels": local["on_the_fly"]}
+                                    for local in self.local_snapshots]
+            }
 
-                self._send_message(conn=self.inspector["conn"], message=message)
+            self._send_message(conn=self.inspector["conn"], message=message)
 
 
 
-    def _get_snapshot(self):
+    def _check_for_marker(self):
 
         bidx = 0
         while True:
-            print("self.branches: ", self.branches)
-            print("self.do_snapshot: ", self.do_snapshot)
-            input("STOP")
-            if (self.branches[bidx]["last_message"]["subject"] == "marker") or self.do_snapshot:
-                sender_id = self._id_to_index(self.do_snapshot)
+            # print("bidx:", bidx)
+            # print('self.branches:', self.branches)
+            if self.branches[bidx]["last_message"] is None:
+                continue
+            if (self.branches[bidx]["last_message"]["subject"] == "marker") or self.do_snapshot >= 0:
+                sender_index = self.do_snapshot
                 self.do_snapshot = -1
                 break
-            bidx = (bidx + 1) % Bank.n_branches
+            bidx = (bidx + 1) % (Bank.n_branches - 1)
 
-        local, channels = self._do_snappy_things(exclude_id=sender_id)
+        self._log(f"Branch {self.branches[sender_index]['id']} has been sent a marker.")
+
+        if self.got_marker:
+            self._log("Duplicated marker => Ignored.")
+            return
+
+        local, channels = self._do_snappy_things(exclude_id=sender_index)
+        print(f"In check4marker, AFTER DO SNAPPY => local:{local} - channels:{channels}")
+
+        try:
+            on_the_fly = sum(channels)
+        except TypeError:
+            on_the_fly = 0
 
         local_snapshot = {
             "id": self.id,
@@ -418,36 +463,46 @@ class Bank:
             "on_the_fly": sum(channels)
         }
 
-        self._send_message(conn=self.branches[sender_id]["out_conn"], message=local_snapshot)
+        self._send_message(conn=self.branches[sender_index]["out_conn"], message=local_snapshot)
 
     def _do_snappy_things(self, exclude_id=None):
 
         own_state = self.balance
         message = {"subject": "marker"}
         bids = []
-        pool = ThreadPool(processes=Bank.n_branches - 1)
+        # pool = ThreadPool(processes=Bank.n_branches - 1)
+        que = Queue()
+        threads = []
         for branch in self.branches:
             self._send_message(branch["out_conn"], message)
-            # threads.append(Thread(target=self._inspect_channel, args=(branch["id"], )))
-            # threads[-1].start()
+
             if branch["id"] != exclude_id:
-                bids.append(branch["id"])
+                threads.append(Thread(target=lambda q, arg1: q.put(self._inspect_channel), args=(que, branch["id"],)))
+                threads[-1].start()
+                # bids.append(branch["id"])
 
-        async_result = pool.apply_async(self._inspect_channel, tuple(bids))  # tuple of args for foo
+        # print("tuple(bids): ", tuple(bids))
+        # async_result = pool.apply_async(self._inspect_channel, args=(tuple(bids),))  # tuple of args for foo
         # do some other stuff in the main process
-        amounts_in_channels = async_result.get()  # get the return value from your function.
-
+        # amounts_in_channels = async_result.get()  # get the return value from your function.
+        for th in threads:
+            th.join()
+        amounts_in_channels = list(que.queue)
+        print("amounts_in_channels: ", amounts_in_channels)
         return own_state, amounts_in_channels
 
         # for th in threads:
         #     th.join()
 
     def _inspect_channel(self, sender_id):
+
+        sender_index = self._id_to_index(sender_id)
+
         amount = 0
-        last_message = {"recv_time": 0, "subject": None, "amount": 0}
+        last_message = {"recv_time": datetime.fromtimestamp(0), "subject": None, "amount": 0}
         while True:
-            if self.branches[sender_id]["last_message"]["recv_time"] > last_message["recv_time"]:
-                last_message = self.branches[sender_id]["last_message"]
+            if self.branches[sender_index]["last_message"]["recv_time"] > last_message["recv_time"]:
+                last_message = self.branches[sender_index]["last_message"]
                 if last_message["subject"] == "marker":
                     return amount
                 elif last_message["subject"] == "transfer":
@@ -471,10 +526,13 @@ class Bank:
         for th in threads:
             th.join()
 
-        t1 = Thread(target=self.do_common)
-        t2 = Thread(target=self.snapshot_process)
+        t1 = Thread(target=self.do_common, name="do_common_th")
+        t2 = Thread(target=self.snapshot_process, name="snapshot_process_th")
         t1.start()
         t2.start()
+
+        # t1.join()
+        # t2.join()
         #
         #
         # pool = ThreadPool(2)
@@ -524,7 +582,7 @@ class Bank:
     '''
 
     def _log(self, message, stdio=True, in_file=False, file_mode="r+"):
-        prefix = datetime.now().strftime("%Y-%m-%d-%H-%M-%S ")
+        prefix = datetime.now().strftime("%Y-%m-%d-%H:%M:%S ")
 
         if stdio:
             print(prefix + str(message))
