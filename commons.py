@@ -404,7 +404,7 @@ class Bank:
 
         self.got_marker = True
         local, channels = self._do_snappy_things()
-        print("AFTER DO SNAPPY => local:",local," - channels:",channels)
+        # print("AFTER DO SNAPPY => local:",local," - channels:",channels)
 
         try:
             on_the_fly = sum(channels)
@@ -417,6 +417,11 @@ class Bank:
             "balance": local,
             "on_the_fly": on_the_fly
         }
+
+        while True:
+            if len(self.local_snapshots) == Bank.n_branches - 1:
+                break
+
         self.local_snapshots.append(local_snapshot)
 
         self._create_global_snapshot()
@@ -424,16 +429,15 @@ class Bank:
     def _create_global_snapshot(self):
 
         # while True:
-        if len(self.local_snapshots) == Bank.n_branches - 1:
-            message = {
-                "subject": "global_snapshot",
-                "local_snapshots": [{"id": local["id"],
-                                     "balance": local["balance"],
-                                     "in_channels": local["on_the_fly"]}
-                                    for local in self.local_snapshots]
-            }
+        message = {
+            "subject": "global_snapshot",
+            "local_snapshots": [{"id": local["id"],
+                                 "balance": local["balance"],
+                                 "in_channels": local["on_the_fly"]}
+                                for local in self.local_snapshots]
+        }
 
-            self._send_message(conn=self.inspector["conn"], message=message)
+        self._send_message(conn=self.inspector["conn"], message=message)
 
 
 
@@ -458,7 +462,7 @@ class Bank:
             return
 
         local, channels = self._do_snappy_things(exclude_id=sender_index)
-        print(f"In check4marker, AFTER DO SNAPPY => local:{local} - channels:{channels}")
+        # print(f"In check4marker, AFTER DO SNAPPY => local:{local} - channels:{channels}")
 
         try:
             on_the_fly = sum(channels)
@@ -478,19 +482,16 @@ class Bank:
 
         own_state = self.balance
         message = {"subject": "marker"}
-        bids = []
-        # pool = ThreadPool(processes=Bank.n_branches - 1)
+
         que = Queue()
         threads = []
         for bindx, branch in enumerate(self.branches):
-            print("branch:", branch)
             self._send_message(branch["out_conn"], message)
 
             if bindx != exclude_id:
                 threads.append(Thread(target=lambda q, arg1: q.put(self._inspect_channel(arg1)),
                                       args=(que, branch["id"],)))
                 threads[-1].start()
-                # bids.append(branch["id"])
 
         # print("tuple(bids): ", tuple(bids))
         # async_result = pool.apply_async(self._inspect_channel, args=(tuple(bids),))  # tuple of args for foo
