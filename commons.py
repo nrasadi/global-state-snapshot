@@ -70,6 +70,7 @@ class Bank:
 
         self.branches = []
         self.processes = []
+        self.recv_queue = Queue()
         self.id = Bank.next_id
         Bank.next_id += 1
         self.balance = 10000000 if balance is None else balance
@@ -88,24 +89,13 @@ class Bank:
         self.port_base = 9900 + self.id * 10 if port is None else port
 
         Bank.branches_public_details.append({"id": self.id, "address": self.address})
-
         Bank.save_class_vars()
 
         self._init_other_branches()
-
         self.inspector = {"port": 11000 + self.id, "address": "localhost", "conn": None}
         self._init_inspector()
-        # Create INET, Streaming sockets
-        # self.out_soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # Bind and Listen
-        # self.in_soc = []
-        # self.out_soc = []
-        # for i in range(Bank.n_branches - 1):
-        #     # TODO: I can't really remember what I was written here!!!
-        #     pass
 
 
-        # Bank.branches_details.append({"id": self.id, "address": self.address, "port_base": self.port_base})
 
     def _init_other_branches(self):
         """
@@ -136,7 +126,7 @@ class Bank:
                 port =  9900 + self.id + i * 10
                 self.branches.append({
                     "id": Bank.branches_public_details[i]["id"],
-                    "port": port,
+                    "port": 9900 + self.id  * 10 + i,
                     "address": Bank.branches_public_details[i]["address"],
                     "in_sock": socket.socket(socket.AF_INET, socket.SOCK_STREAM),
                     "in_conn": None,
@@ -189,8 +179,9 @@ class Bank:
         if result["status"]:
             self.balance -= amount
 
-        self._log(f"Branch {self.id}: {amount * Bank.money_unit[0]}{Bank.money_unit[1]} Transferred TO the branch "
+        self._log(f"Branch {self.id}: {amount * Bank.money_unit[0]}{Bank.money_unit[1]:>8} Transferred TO the branch "
                   f"{receiver['id']}. (send_time:{result['send_time']})")
+        print("self.balance:", self.balance)
 
         return result
 
@@ -249,10 +240,6 @@ class Bank:
         #
         # for se in send:
         #     se.join()
-
-
-
-
 
     def _do_common_transfer(self, receiver_id):
         """
@@ -339,15 +326,26 @@ class Bank:
             "in_sock": socket, "in_conn": input socket connection, "out_conn": output socket connection]
         :return:s
         """
+
+        recv_messages_th = Thread(target=self._recv_messages, args=(sender_id,), name="recv_messages_th")
+        recv_messages_th.start()
+
         sender_index = self._id_to_index(sender_id)
 
         sender = self.branches[sender_index]
 
         while True:
-            pickled_data = sender["in_conn"].recv(4096)
-            message = pickle.loads(pickled_data)
-            # Add an intentional delay to simulate end-to-end connection latency.
-            # sleep(Bank.time_unit * np.random.randint(1, 11))
+            # pickled_data = sender["in_conn"].recv(4096)
+            # message = pickle.loads(pickled_data)
+            if not self.recv_queue.empty():
+                message = self.recv_queue.get()
+                # Add an intentional delay to simulate end-to-end connection latency.
+                sleep(Bank.time_unit * np.random.randint(1, 11))
+            else:
+                continue
+
+            print("received: ", message)
+
             recv_time = datetime.now()
             amount = 0
             if message["subject"].lower() == "transfer":
@@ -356,8 +354,8 @@ class Bank:
                 message_to_insp = {
                     "subject": "receive",
                     "amount": message["amount"],
-                    "sender_id": self.id,
-                    "receiver_id": sender["id"],
+                    "sender_id": sender["id"],
+                    "receiver_id": self.id,
                     "receive_time": recv_time
                 }
                 # print("received message: ", message)
@@ -371,6 +369,17 @@ class Bank:
             self.branches[sender_index]["last_message"] = {"recv_time": recv_time,
                                                          "amount": amount,
                                                          "subject": message["subject"]}
+            print("IN RECEIVE: self.balance:", self.balance)
+
+    def _recv_messages(self, sender_id):
+
+        sender_index = self._id_to_index(sender_id)
+        sender = self.branches[sender_index]
+        while True:
+            pickled_data = sender["in_conn"].recv(4096)
+            message = pickle.loads(pickled_data)
+            self.recv_queue.put_nowait(message)
+
 
     def snapshot_process(self):
 
@@ -442,7 +451,7 @@ class Bank:
                 break
             bidx = (bidx + 1) % (Bank.n_branches - 1)
 
-        self._log(f"Branch {self.branches[sender_index]['id']} has been sent a marker.")
+        self._log(f"Branch {self.branches[sender_index]['id']} has sent a marker.")
 
         if self.got_marker:
             self._log("Duplicated marker => Ignored.")
@@ -473,11 +482,13 @@ class Bank:
         # pool = ThreadPool(processes=Bank.n_branches - 1)
         que = Queue()
         threads = []
-        for branch in self.branches:
+        for bindx, branch in enumerate(self.branches):
+            print("branch:", branch)
             self._send_message(branch["out_conn"], message)
 
-            if branch["id"] != exclude_id:
-                threads.append(Thread(target=lambda q, arg1: q.put(self._inspect_channel), args=(que, branch["id"],)))
+            if bindx != exclude_id:
+                threads.append(Thread(target=lambda q, arg1: q.put(self._inspect_channel(arg1)),
+                                      args=(que, branch["id"],)))
                 threads[-1].start()
                 # bids.append(branch["id"])
 
@@ -499,7 +510,7 @@ class Bank:
         sender_index = self._id_to_index(sender_id)
 
         amount = 0
-        last_message = {"recv_time": datetime.fromtimestamp(0), "subject": None, "amount": 0}
+        last_message = self.branches[sender_index]["last_message"]
         while True:
             if self.branches[sender_index]["last_message"]["recv_time"] > last_message["recv_time"]:
                 last_message = self.branches[sender_index]["last_message"]
@@ -582,7 +593,7 @@ class Bank:
     '''
 
     def _log(self, message, stdio=True, in_file=False, file_mode="r+"):
-        prefix = datetime.now().strftime("%Y-%m-%d-%H:%M:%S ")
+        prefix = datetime.now().strftime("%Y%m%d-%H:%M:%S ")
 
         if stdio:
             print(prefix + str(message))
