@@ -181,7 +181,6 @@ class Bank:
 
         self._log(f"Branch {self.id}: {amount * Bank.money_unit[0]}{Bank.money_unit[1]:>8} Transferred TO the branch "
                   f"{receiver['id']}. (send_time:{result['send_time']})")
-        print("self.balance:", self.balance)
 
         return result
 
@@ -256,7 +255,7 @@ class Bank:
 
         receiver = self.branches[receiver_id]
 
-        max_n_send = 5
+        max_n_send = 500
 
         while True:
 
@@ -344,7 +343,7 @@ class Bank:
             else:
                 continue
 
-            print("received: ", message)
+            # print("received: ", message)
 
             recv_time = datetime.now()
             amount = 0
@@ -369,7 +368,6 @@ class Bank:
             self.branches[sender_index]["last_message"] = {"recv_time": recv_time,
                                                          "amount": amount,
                                                          "subject": message["subject"]}
-            print("IN RECEIVE: self.balance:", self.balance)
 
     def _recv_messages(self, sender_id):
 
@@ -385,14 +383,15 @@ class Bank:
 
         self._log("snapshot")
 
-        t1 = Thread(target=self._init_snapshot, name="init_snapshot_th")
-        t2 = Thread(target=self._check_for_marker, name="check_for_marker_th")
+        while True:
+            t1 = Thread(target=self._init_snapshot, name="init_snapshot_th")
+            t2 = Thread(target=self._check_for_marker, name="check_for_marker_th")
 
-        t1.start()
-        t2.start()
+            t1.start()
+            t2.start()
 
-        # t1.join()
-        # t2.join()
+            t1.join()
+            t2.join()
 
     def _init_snapshot(self):
 
@@ -511,7 +510,12 @@ class Bank:
         sender_index = self._id_to_index(sender_id)
 
         amount = 0
+
         last_message = self.branches[sender_index]["last_message"]
+        if last_message is None:
+            print("last message in None")
+            return amount
+
         while True:
             if self.branches[sender_index]["last_message"]["recv_time"] > last_message["recv_time"]:
                 last_message = self.branches[sender_index]["last_message"]
