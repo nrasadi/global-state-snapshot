@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from commons import Bank
+from bank import Bank
 from inspector import Inspector
 
 if __name__ == '__main__':
@@ -21,8 +21,12 @@ if __name__ == '__main__':
     args = ap.parse_args()
 
     if args.clear:
-        os.remove(str(Bank.bank_file))
-        print("Bank information file removed.")
+        try:
+            os.remove(str(Bank.bank_file))
+            print("Bank information file removed.")
+        except FileNotFoundError:
+            print("File not found. It has already been removed.")
+
         exit(0)
 
     if args.bank and args.inspector:

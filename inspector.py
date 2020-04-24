@@ -6,7 +6,8 @@ import socket
 
 import numpy as np
 
-from commons import Bank, Constants
+from commons import Constants
+from bank import Bank
 
 
 class Inspector:
@@ -20,9 +21,10 @@ class Inspector:
         self.lock = threading.Lock()
 
         self.log_database = Constants.dir_root / "inspector.log"
-        self.log_database.mkdir(parents=True) if not self.log_database.is_dir() else None
 
         self.connect_to_branches()
+
+        self._log("INSPECTOR LOG\n", in_file=True, stdio=False, file_mode="w")
 
     def connect_to_branches(self):
 
@@ -46,6 +48,8 @@ class Inspector:
 
     def get_messages(self, bid):
 
+        n_global_snapshots = 0
+
         bid = self._id_to_index(bid)
 
         self.branches[bid]["in_conn"], self.branches[bid]["address"] = self.branches[bid]["in_sock"].accept()
@@ -62,22 +66,25 @@ class Inspector:
             elif message["subject"] == "receive":
                 send_message = self.find_transfer_message(message, remove=True)
                 if send_message:
-                    log_message = f'sender:{send_message["sender_id"]} ' \
+                    log_message = f'sender:{send_message["sender_id"]:>2} ' \
                                   f'- send_time:{send_message["send_time"].strftime("%H:%M:%S ")}' \
-                                  f'- amount:{send_message["amount"]}{Bank.money_unit[0]} {Bank.money_unit[1]}' \
-                                  f'- receiver:{send_message["receiver_id"]}' \
+                                  f'- amount:{send_message["amount"]:>9}{Bank.money_unit[0]} {Bank.money_unit[1]}' \
+                                  f'- receiver:{send_message["receiver_id"]:>2}' \
                                   f'- receive_time:{message["receive_time"].strftime("%H:%M:%S ")}'
                     self._log(log_message, in_file=True)
 
             elif message["subject"] == "global_snapshot":
 
+                n_global_snapshots += 1
 
                 log_message = '\n===========================================================================\n' \
-                              'Global Snapshot:'
+                              f'Global Snapshot #{n_global_snapshots}' \
+                              f'     Request Time:{message["request_time"].strftime("%Y-%m-%d:%H:%M:%S")}' \
+                              f'     Preparation Time:{message["preparation_time"].strftime("%Y-%m-%d:%H:%M:%S")}'
                 for snapshot in message["local_snapshots"]:
-                              log_message += f'\nBranch {snapshot["id"]}: ' \
-                                             f'Balance:{snapshot["balance"]}{Bank.money_unit[0]} {Bank.money_unit[1]}' \
-                                             f' - In Channels: {snapshot["in_channels"]}{Bank.money_unit[0]}' \
+                              log_message += f'\nBranch {snapshot["id"]:>2}: ' \
+                                             f'Balance:{snapshot["balance"]:>9}{Bank.money_unit[0]} {Bank.money_unit[1]}' \
+                                             f' - In Channels: {snapshot["in_channels"]:>9}{Bank.money_unit[0]}' \
                                              f' {Bank.money_unit[1]}'
                 log_message += '\n===========================================================================\n'
 
@@ -113,7 +120,7 @@ class Inspector:
             threads[i].join()
 
 
-    def _log(self, message, stdio=True, in_file=False, file_mode="r+"):
+    def _log(self, message, stdio=True, in_file=False, file_mode="a+"):
         prefix = datetime.now().strftime("%Y-%m-%d:%H:%M:%S ")
 
         if stdio:
@@ -121,7 +128,7 @@ class Inspector:
 
         if in_file:
             with open(self.log_database, mode=file_mode) as f:
-                f.write(prefix + str(message))
+                f.write(prefix + str(message) + "\n")
 
     def _id_to_index(self, bid):
         return [i for i, branch in enumerate(self.branches) if branch["id"]==bid][0]
