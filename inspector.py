@@ -19,6 +19,7 @@ class Inspector:
         self.branches = []
         self.received_messages = []
         self.lock = threading.Lock()
+        self.n_global_snapshots = 0
 
         self.log_database = Constants.dir_root / "inspector.log"
 
@@ -48,8 +49,6 @@ class Inspector:
 
     def get_messages(self, bid):
 
-        n_global_snapshots = 0
-
         bid = self._id_to_index(bid)
 
         self.branches[bid]["in_conn"], self.branches[bid]["address"] = self.branches[bid]["in_sock"].accept()
@@ -68,24 +67,26 @@ class Inspector:
                 if send_message:
                     log_message = f'sender:{send_message["sender_id"]:>2} ' \
                                   f'- send_time:{send_message["send_time"].strftime("%H:%M:%S ")}' \
-                                  f'- amount:{send_message["amount"]:>9}{Bank.money_unit[0]} {Bank.money_unit[1]}' \
+                                  f'- amount:{send_message["amount"]:>9}{Bank.money_unit[0]} {Bank.money_unit[1]} ' \
                                   f'- receiver:{send_message["receiver_id"]:>2}' \
                                   f'- receive_time:{message["receive_time"].strftime("%H:%M:%S ")}'
                     self._log(log_message, in_file=True)
 
             elif message["subject"] == "global_snapshot":
 
-                n_global_snapshots += 1
-
+                self.n_global_snapshots += 1
+                total_balance = 0
                 log_message = '\n===========================================================================\n' \
-                              f'Global Snapshot #{n_global_snapshots}' \
+                              f'Global Snapshot #{self.n_global_snapshots}' \
                               f'     Request Time:{message["request_time"].strftime("%Y-%m-%d:%H:%M:%S")}' \
                               f'     Preparation Time:{message["preparation_time"].strftime("%Y-%m-%d:%H:%M:%S")}'
                 for snapshot in message["local_snapshots"]:
-                              log_message += f'\nBranch {snapshot["id"]:>2}: ' \
-                                             f'Balance:{snapshot["balance"]:>9}{Bank.money_unit[0]} {Bank.money_unit[1]}' \
-                                             f' - In Channels: {snapshot["in_channels"]:>9}{Bank.money_unit[0]}' \
-                                             f' {Bank.money_unit[1]}'
+                    log_message += f'\nBranch {snapshot["id"]:>2}: ' \
+                                 f'Balance:{snapshot["balance"]:>9}{Bank.money_unit[0]} {Bank.money_unit[1]}' \
+                                 f' - In Channels: {snapshot["in_channels"]:>9}{Bank.money_unit[0]}' \
+                                 f' {Bank.money_unit[1]}'
+                    total_balance += snapshot["balance"] + snapshot["in_channels"]
+                log_message += f"\nTotal Balance: {total_balance}{Bank.money_unit[0]} {Bank.money_unit[1]}"
                 log_message += '\n===========================================================================\n'
 
                 self._log(log_message, in_file=True)

@@ -19,7 +19,7 @@ class Bank:
     bank_file = consts.dir_bank / "bank.json"
     money_unit = "k", "Toomaan"
     time_unit = 0.5  # Seconds
-    n_branches = 3
+    n_branches = 4
     branches_public_details = []
     next_id = 0
 
@@ -52,7 +52,7 @@ class Bank:
             json.dump({"branch_details":Bank.branches_public_details}, f)
 
 
-    def __init__(self, balance=None, address=None, port=None, max_number_of_send=2):
+    def __init__(self, balance=None, address=None, port=None, max_number_of_send=1000):
 
         self._log("Initiating ...")
 
@@ -263,7 +263,6 @@ class Bank:
                     self._send_message(conn=self.inspector["conn"], message=message)
 
                     max_n_send -= 1
-                    print("max_n_send:")
 
     def _do_common_receive(self, sender_id):
         """
@@ -362,6 +361,8 @@ class Bank:
 
         try:
             on_the_fly = sum(channels)
+            # Uncomment it if you want to get per channel amounts
+            # on_the_fly = channels
         except TypeError:
             on_the_fly = 0
 
@@ -426,6 +427,8 @@ class Bank:
 
         try:
             on_the_fly = sum(channels)
+            # Uncomment it if you want to get per channel amounts
+            # on_the_fly = channels
         except TypeError:
             on_the_fly = 0
 
