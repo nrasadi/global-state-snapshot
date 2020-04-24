@@ -3,11 +3,8 @@ import threading
 from threading import Thread
 from datetime import datetime
 import socket
-from multiprocessing import Pool
-from multiprocessing.pool import ThreadPool
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 from commons import Bank, Constants
 
@@ -29,12 +26,12 @@ class Inspector:
 
     def connect_to_branches(self):
 
-        self._log("All branches are not started working yet. Waiting for the others ...")
+        self._log("Waiting for branches ...")
 
         while True:
             Bank.load_class_vars()
             if len(Bank.branches_public_details) == Bank.n_branches:
-                self._log(f"All {Bank.n_branches} branches are open now. Resuming the procedure ...")
+                self._log(f"All {Bank.n_branches} branches are open now. Resuming the process.")
                 break
 
         for i in range(Bank.n_branches):
@@ -67,24 +64,24 @@ class Inspector:
                 if send_message:
                     log_message = f'sender:{send_message["sender_id"]} ' \
                                   f'- send_time:{send_message["send_time"].strftime("%H:%M:%S ")}' \
-                                  f'- amount:{send_message["amount"] * Bank.money_unit[0]}{Bank.money_unit[1]}' \
+                                  f'- amount:{send_message["amount"]}{Bank.money_unit[0]} {Bank.money_unit[1]}' \
                                   f'- receiver:{send_message["receiver_id"]}' \
                                   f'- receive_time:{message["receive_time"].strftime("%H:%M:%S ")}'
-                    self._log(log_message)
+                    self._log(log_message, in_file=True)
 
             elif message["subject"] == "global_snapshot":
 
 
-                log_message = '\n============================================================\n' \
+                log_message = '\n===========================================================================\n' \
                               'Global Snapshot:'
                 for snapshot in message["local_snapshots"]:
                               log_message += f'\nBranch {snapshot["id"]}: ' \
-                                             f'Balance:{snapshot["balance"] * Bank.money_unit[0]}{Bank.money_unit[1]}' \
-                                             f'- In Channels: {snapshot["in_channels"] * Bank.money_unit[0]}' \
-                                             f'{Bank.money_unit[1]}'
-                log_message += '\n============================================================\n'
+                                             f'Balance:{snapshot["balance"]}{Bank.money_unit[0]} {Bank.money_unit[1]}' \
+                                             f' - In Channels: {snapshot["in_channels"]}{Bank.money_unit[0]}' \
+                                             f' {Bank.money_unit[1]}'
+                log_message += '\n===========================================================================\n'
 
-                self._log(log_message)
+                self._log(log_message, in_file=True)
 
     def find_transfer_message(self, message, remove=True):
 
