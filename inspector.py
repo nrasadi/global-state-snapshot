@@ -1,20 +1,20 @@
 import pickle
 import socket
-import threading
-from threading import Thread
-from typing import Any, Mapping
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+from typing import Any, List, Mapping
 
 from bank import Bank
 from commons import BaseClass, Constants
 
 
 class Inspector(BaseClass):
-    def __init__(self, address="localhost"):
+    def __init__(self, address: str = "localhost"):
 
         self.address = address
-        self.branches = []
-        self.received_messages = []
-        self.lock = threading.Lock()
+        self.branches: List[Mapping[str, Any]] = []
+        self.received_messages: List[Mapping[str, Any]] = []
+        self.lock = Lock()
         self.n_global_snapshots = 0
 
         self.log_database = Constants.dir_root / "inspector.log"
@@ -104,28 +104,18 @@ class Inspector(BaseClass):
 
     def find_transfer_message(self, message: Mapping[str, Any], remove: bool = True):
 
-        self.lock.acquire()
-        send_message = False
-        for i, prev_message in enumerate(self.received_messages):
-            if (
-                prev_message["amount"] == message["amount"]
-                and prev_message["sender_id"] == message["sender_id"]
-                and prev_message["receiver_id"] == message["receiver_id"]
-            ):
+        with self.lock:
+            for i, prev_message in enumerate(self.received_messages):
+                if (
+                    prev_message["amount"] == message["amount"]
+                    and prev_message["sender_id"] == message["sender_id"]
+                    and prev_message["receiver_id"] == message["receiver_id"]
+                ):
 
-                send_message = self.received_messages.pop(i) if remove else prev_message
+                    return self.received_messages.pop(i) if remove else prev_message
 
-                self.lock.release()
-                return send_message
-
-        self.lock.release()
-        return send_message
+        return False
 
     def run(self):
-
-        threads = []
-        for i in range(Bank.n_branches):
-            threads.append(Thread(target=self.get_messages, args=(i,)))
-            threads[-1].start()
-        for i in range(Bank.n_branches):
-            threads[i].join()
+        with ThreadPoolExecutor() as executor:
+            executor.map(self.get_messages, range(Bank.n_branches))

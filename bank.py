@@ -2,6 +2,7 @@ import json
 import pickle
 import random
 import socket
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from queue import Queue
 from threading import Lock, Thread
@@ -204,17 +205,15 @@ class Bank(BaseClass):
         :param message: it can be everything
         :return: a dictionary with these keys: [status: Bool, send_time: datetime object]
         """
-        self.lock.acquire()
         send_time = datetime.now()
 
         try:
             message = pickle.dumps(message)
-            conn.sendall(message)
+            with self.lock:
+                conn.sendall(message)
             status = True
         except Exception:
             status = False
-
-        self.lock.release()
 
         return {
             "status": status,  # True (succeeded) or False (failed)
@@ -232,18 +231,11 @@ class Bank(BaseClass):
         :return: None
         """
 
-        receive = []
-        send = []
-        for branch in self.branches:
-            send.append(Thread(target=self._do_common_transfer, args=(branch["id"], ),
-                               name=f"common_transfer_to{branch['id']}_th"))
-
-            receive.append(Thread(target=self._do_common_receive, args=(branch["id"],),
-                                  name=f"common_receive_from{branch['id']}_th"))
-
-        for th1, th2 in zip(receive, send):
-            th1.start()
-            th2.start()
+        with ThreadPoolExecutor(thread_name_prefix="common_send_receive") as executor:
+            for branch in self.branches:
+                branch_id = branch["_id"]
+                executor.submit(self._do_common_transfer, branch_id)
+                executor.submit(self._do_common_receive, branch_id)
 
     def _do_common_transfer(self, receiver_id: int):
         """
@@ -357,17 +349,9 @@ class Bank(BaseClass):
     def snapshot_process(self):
 
         while True:
-            init_snapshot_th = Thread(
-                target=self._init_snapshot, name="init_snapshot_th"
-            )
-            check_for_marker_th = Thread(
-                target=self._check_for_marker, name="check_for_marker_th"
-            )
-            init_snapshot_th.start()
-            check_for_marker_th.start()
-
-            check_for_marker_th.join()
-            init_snapshot_th.join()
+            with ThreadPoolExecutor(thread_name_prefix="snapshot_process") as executor:
+                executor.submit(self._init_snapshot)
+                executor.submit(self._check_for_marker)
 
             self.got_marker = False
             self.do_snapshot = -1
@@ -496,26 +480,18 @@ class Bank(BaseClass):
         message = {"subject": "marker", "initiator": initiator}
 
         que = Queue()
-        threads = []
-        for branch_idx, branch in enumerate(self.branches):
-            status = self._send_message(branch["out_conn"], message)
-            if status["status"]:
-                self._log(f"Sent marker TO {branch['id']}", in_file=True)
+        with ThreadPoolExecutor() as executor:
+            for branch_idx, branch in enumerate(self.branches):
+                status = self._send_message(branch["out_conn"], message)
+                if status["status"]:
+                    self._log(f"Sent marker To {branch['id']}", in_file=True)
 
-            if branch_idx != exclude_index:
-                threads.append(
-                    Thread(
-                        target=lambda q, arg1: q.put(self._inspect_channel(arg1)),
-                        args=(
-                            que,
-                            branch["id"],
-                        ),
+                if branch_idx != exclude_index:
+                    executor.submit(
+                        lambda q, arg1: q.put(self._inspect_channel(arg1)),
+                        que,
+                        branch["id"],
                     )
-                )
-                threads[-1].start()
-
-        for th in threads:
-            th.join()
 
         amounts_in_channels = list(que.queue)
 
@@ -543,24 +519,15 @@ class Bank(BaseClass):
                 continue
 
     def run(self):
+        with ThreadPoolExecutor(thread_name_prefix="bank_server_client") as executor:
+            for branch in self.branches:
+                branch_id = branch["id"]
 
-        threads = []
-        for branch in self.branches:
+                executor.submit(self._connect_to_branch, branch_id, "client")
 
-            threads.append(
-                Thread(target=self._connect_to_branch, args=(branch["id"], "client"))
-            )
-            threads[-1].start()
+                sleep(0.5)
 
-            sleep(0.5)
-
-            threads.append(
-                Thread(target=self._connect_to_branch, args=(branch["id"], "server"))
-            )
-            threads[-1].start()
-
-        for th in threads:
-            th.join()
+                executor.submit(self._connect_to_branch, branch_id, "server")
 
         t1 = Thread(target=self.do_common, name="do_common_th")
         t2 = Thread(target=self.snapshot_process, name="snapshot_process_th")
