@@ -5,7 +5,7 @@ import socket
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from queue import Queue
-from threading import Lock, Thread
+from threading import Lock
 from time import sleep
 from typing import Any, Literal, Mapping, Optional
 
@@ -289,53 +289,53 @@ class Bank(BaseClass):
         :return:
         """
 
-        recv_messages_th = Thread(
-            target=self._recv_messages, args=(sender_id,), name="recv_messages_th"
-        )
-        recv_messages_th.start()
+        with ThreadPoolExecutor("recv_messages_th") as executor:
+            executor.submit(self._recv_messages, sender_id)
 
-        sender_index = self._id_to_index(sender_id)
+            sender_index = self._id_to_index(sender_id)
 
-        sender = self.branches[sender_index]
+            sender = self.branches[sender_index]
 
-        while True:
-            if self.recv_queue[sender_index].empty():
-                continue
+            while True:
+                if self.recv_queue[sender_index].empty():
+                    continue
 
-            message = self.recv_queue[sender_index].get()
-            # Add an intentional delay to simulate end-to-end connection latency.
-            sleep(self.time_unit * random.randint(1, 10))
+                message = self.recv_queue[sender_index].get()
+                # Add an intentional delay to simulate end-to-end connection latency.
+                sleep(self.time_unit * random.randint(1, 10))
 
-            recv_time = datetime.now()
-            amount = 0
-            if message["subject"].lower() == "transfer":
-                amount += message["amount"]
-                self.balance += amount
-                message_to_insp = {
-                    "subject": "receive",
-                    "amount": message["amount"],
-                    "sender_id": sender["id"],
-                    "receiver_id": self.id,
-                    "receive_time": recv_time,
+                recv_time = datetime.now()
+                amount = 0
+                if message["subject"].lower() == "transfer":
+                    amount += message["amount"]
+                    self.balance += amount
+                    message_to_insp = {
+                        "subject": "receive",
+                        "amount": message["amount"],
+                        "sender_id": sender["id"],
+                        "receiver_id": self.id,
+                        "receive_time": recv_time,
+                    }
+
+                    self._send_message(
+                        conn=self.inspector["conn"], message=message_to_insp
+                    )
+
+                elif message["subject"].lower() == "snapshot":
+                    self._log(
+                        f"Branch {sender_id} has just sent its local snapshot.",
+                        in_file=True,
+                    )
+                    self.local_snapshots.append(message)
+
+                last_message = {
+                    "recv_time": recv_time,
+                    "amount": amount,
+                    "subject": message["subject"],
                 }
-
-                self._send_message(conn=self.inspector["conn"], message=message_to_insp)
-
-            elif message["subject"].lower() == "snapshot":
-                self._log(
-                    f"Branch {sender_id} has just sent its local snapshot.",
-                    in_file=True,
-                )
-                self.local_snapshots.append(message)
-
-            last_message = {
-                "recv_time": recv_time,
-                "amount": amount,
-                "subject": message["subject"],
-            }
-            if "initiator" in message.keys():
-                last_message["initiator"] = message["initiator"]
-            self.branches[sender_index]["last_message"].put(last_message)
+                if "initiator" in message:
+                    last_message["initiator"] = message["initiator"]
+                self.branches[sender_index]["last_message"].put(last_message)
 
     def _recv_messages(self, sender_id: int):
 
@@ -529,10 +529,9 @@ class Bank(BaseClass):
 
                 executor.submit(self._connect_to_branch, branch_id, "server")
 
-        t1 = Thread(target=self.do_common, name="do_common_th")
-        t2 = Thread(target=self.snapshot_process, name="snapshot_process_th")
-        t1.start()
-        t2.start()
+        with ThreadPoolExecutor() as executor:
+            executor.submit(self.do_common)
+            executor.submit(self.snapshot_process)
 
     def _connect_to_branch(self, bid: int, mode: Literal["server", "client"]):
         """
