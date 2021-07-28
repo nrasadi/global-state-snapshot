@@ -4,11 +4,11 @@ It is the implementation of [Chandy and Lamport's snapshot algorithm](https://la
 In this project, we instantiate four bank branches before the inspector records the global state, by default.
 We can change it by altering the `n_branches` variable of the `Bank` class in `bank.py`.
 The transaction is performed every 0.5 seconds by default. We can change it too by changing the `time_unit` variable in the same class.
-A branch can initiate a snapshot at any time by pressing **s** in the terminal.
+A branch can initiate a snapshot at any time by pressing 's' in the terminal.
 
 ## Platform
 
-Although through testing of the project was done in Arch Linux. It should run fine in other operating systems too.
+Although we did thorough testing of the project in Arch Linux, it should run fine in other operating systems.
 
 ## Dependencies
 
