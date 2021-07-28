@@ -7,10 +7,10 @@ from queue import Queue
 from threading import Lock, Thread
 from time import sleep
 
-from commons import Constants, KBHit
+from commons import BaseClass, Constants, KBHit
 
 
-class Bank:
+class Bank(BaseClass):
 
     # Class Variables
     consts = Constants()
@@ -44,7 +44,6 @@ class Bank:
 
     @staticmethod
     def save_class_vars():
-
         with open(Bank.bank_file, "w") as f:
             json.dump({"branch_details": Bank.branches_public_details}, f)
 
@@ -233,6 +232,7 @@ class Bank:
             send.append(Thread(**params))
 
             receive.append(Thread(**params))
+
         for th1, th2 in zip(receive, send):
             th1.start()
             th2.start()
@@ -581,18 +581,3 @@ class Bank:
                 )
                 self.branches[bid]["out_conn"].connect((address, port))
                 break
-
-    def _log(self, message, stdio=True, in_file=False, file_mode="a+"):
-        prefix = datetime.now().strftime("%Y%m%d-%H:%M:%S ")
-
-        if stdio:
-            print(prefix + str(message))
-
-        if in_file:
-            with open(self.log_database, mode=file_mode) as f:
-                f.write(prefix + str(message) + "\n")
-
-    def _id_to_index(self, bid):
-        for i, branch in enumerate(self.branches):
-            if branch["id"] == bid:
-                return i
