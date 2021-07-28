@@ -2,7 +2,7 @@ import pickle
 import socket
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
-from typing import Any, List, Mapping
+from typing import Any, List, Mapping, NoReturn, Optional
 
 from bank import Bank
 from commons import BaseClass, Constants
@@ -23,7 +23,7 @@ class Inspector(BaseClass):
 
         self._log("INSPECTOR LOG\n", in_file=True, stdio=False, file_mode="w")
 
-    def connect_to_branches(self):
+    def connect_to_branches(self) -> None:
 
         self._log("Waiting for branches ...")
 
@@ -50,7 +50,7 @@ class Inspector(BaseClass):
             )
             self.branches[-1]["in_sock"].listen(1)
 
-    def get_messages(self, bid: int):
+    def get_messages(self, bid: int) -> NoReturn:
 
         bid = self._id_to_index(bid)
 
@@ -102,7 +102,9 @@ class Inspector(BaseClass):
 
                 self._log(log_message, in_file=True)
 
-    def find_transfer_message(self, message: Mapping[str, Any], remove: bool = True):
+    def find_transfer_message(
+        self, message: Mapping[str, Any], remove: bool = True
+    ) -> Optional[Mapping[str, Any]]:
 
         with self.lock:
             for i, prev_message in enumerate(self.received_messages):
@@ -114,8 +116,6 @@ class Inspector(BaseClass):
 
                     return self.received_messages.pop(i) if remove else prev_message
 
-        return False
-
-    def run(self):
+    def run(self) -> None:
         with ThreadPoolExecutor() as executor:
             executor.map(self.get_messages, range(Bank.n_branches))

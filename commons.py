@@ -48,14 +48,14 @@ class KBHit:
             # Support normal-terminal reset at exit
             atexit.register(self.set_normal_term)
 
-    def set_normal_term(self):
+    def set_normal_term(self) -> None:
         """
         Resets to normal terminal.  On Windows this is a no-op.
         """
         if os.name != "nt":
             termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.old_term)
 
-    def getch(self):
+    def getch(self) -> str:
         """
         Returns a keyboard character after kbhit() has been called.
             Should not be called in the same program as getarrow().
@@ -63,7 +63,7 @@ class KBHit:
 
         return msvcrt.getch().decode("utf-8") if os.name == "nt" else sys.stdin.read(1)
 
-    def getarrow(self):
+    def getarrow(self) -> int:
         """Returns an arrow-key code after kbhit() has been called. Codes are
         0 : up
         1 : right
@@ -83,7 +83,7 @@ class KBHit:
 
         return vals.index(ord(c.decode("utf-8")))
 
-    def kbhit(self):
+    def kbhit(self) -> bool:
         """
         Returns True if keyboard character was hit, False otherwise.
         """
@@ -101,7 +101,7 @@ class BaseClass:
 
     def _log(
         self, message, stdio: bool = True, in_file: bool = False, file_mode: str = "a"
-    ):
+    ) -> None:
         prefix = datetime.now().strftime("%Y-%m-%d:%H:%M:%S ")
 
         output_string = f"{prefix}{message}"
@@ -113,7 +113,7 @@ class BaseClass:
             with open(self.log_database, mode=file_mode) as f:
                 f.write(output_string + "\n")
 
-    def _id_to_index(self, bid: int):
+    def _id_to_index(self, bid: int) -> int:
         for i, branch in enumerate(self.branches):
             if branch["id"] == bid:
                 return i
