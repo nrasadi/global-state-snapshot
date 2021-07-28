@@ -2,6 +2,7 @@ import pickle
 import socket
 import threading
 from threading import Thread
+from typing import Any, Mapping
 
 from bank import Bank
 from commons import BaseClass, Constants
@@ -49,7 +50,7 @@ class Inspector(BaseClass):
             )
             self.branches[-1]["in_sock"].listen(1)
 
-    def get_messages(self, bid):
+    def get_messages(self, bid: int):
 
         bid = self._id_to_index(bid)
 
@@ -101,7 +102,7 @@ class Inspector(BaseClass):
 
                 self._log(log_message, in_file=True)
 
-    def find_transfer_message(self, message, remove=True):
+    def find_transfer_message(self, message: Mapping[str, Any], remove: bool = True):
 
         self.lock.acquire()
         send_message = False
@@ -112,10 +113,7 @@ class Inspector(BaseClass):
                 and prev_message["receiver_id"] == message["receiver_id"]
             ):
 
-                if remove:
-                    send_message = self.received_messages.pop(i)
-                else:
-                    send_message = self.received_messages[i]
+                send_message = self.received_messages.pop(i) if remove else prev_message
 
                 self.lock.release()
                 return send_message

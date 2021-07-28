@@ -35,9 +35,7 @@ class KBHit:
         """
         Creates a KBHit object that you can call to do various keyboard things.
         """
-        if os.name == "nt":
-            pass
-        else:
+        if os.name != "nt":
             # Save the terminal settings
             self.fd = sys.stdin.fileno()
             self.new_term = termios.tcgetattr(self.fd)
@@ -54,10 +52,7 @@ class KBHit:
         """
         Resets to normal terminal.  On Windows this is a no-op.
         """
-
-        if os.name == "nt":
-            pass
-        else:
+        if os.name != "nt":
             termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.old_term)
 
     def getch(self):
@@ -66,10 +61,7 @@ class KBHit:
             Should not be called in the same program as getarrow().
         """
 
-        if os.name == "nt":
-            return msvcrt.getch().decode("utf-8")
-        else:
-            return sys.stdin.read(1)
+        return msvcrt.getch().decode("utf-8") if os.name == "nt" else sys.stdin.read(1)
 
     def getarrow(self):
         """Returns an arrow-key code after kbhit() has been called. Codes are
@@ -98,7 +90,7 @@ class KBHit:
         if os.name == "nt":
             return msvcrt.kbhit()
         else:
-            dr, dw, de = select([sys.stdin], [], [], 0)
+            dr, _, _ = select([sys.stdin], [], [], 0)
             return dr != []
 
 
@@ -107,17 +99,21 @@ class BaseClass:
     Base class for both bank and inspector
     """
 
-    def _log(self, message, stdio=True, in_file=False, file_mode="a+"):
+    def _log(
+        self, message, stdio: bool = True, in_file: bool = False, file_mode: str = "a+"
+    ):
         prefix = datetime.now().strftime("%Y-%m-%d:%H:%M:%S ")
 
+        output_string = f"{prefix}{message}"
+
         if stdio:
-            print(prefix + str(message))
+            print(output_string)
 
         if in_file:
             with open(self.log_database, mode=file_mode) as f:
-                f.write(prefix + str(message) + "\n")
+                f.write(output_string + "\n")
 
-    def _id_to_index(self, bid):
+    def _id_to_index(self, bid: int):
         for i, branch in enumerate(self.branches):
             if branch["_id"] == bid:
                 return i
