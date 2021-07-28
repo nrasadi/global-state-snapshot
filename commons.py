@@ -1,7 +1,7 @@
 import os
 
 # Windows
-if os.name == 'nt':
+if os.name == "nt":
     import msvcrt
 # Posix (Linux, OS X)
 else:
@@ -12,9 +12,11 @@ else:
 
 from pathlib import Path
 
+
 class Constants:
     dir_root = Path("logs/")
     dir_bank = Path("bank/")
+
 
 class KBHit:
 
@@ -32,7 +34,7 @@ class KBHit:
         """
         Creates a KBHit object that you can call to do various keyboard things.
         """
-        if os.name == 'nt':
+        if os.name == "nt":
             pass
         else:
             # Save the terminal settings
@@ -41,7 +43,7 @@ class KBHit:
             self.old_term = termios.tcgetattr(self.fd)
 
             # New terminal setting unbuffered
-            self.new_term[3] = (self.new_term[3] & ~termios.ICANON & ~termios.ECHO)
+            self.new_term[3] = self.new_term[3] & ~termios.ICANON & ~termios.ECHO
             termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.new_term)
 
             # Support normal-terminal reset at exit
@@ -49,10 +51,10 @@ class KBHit:
 
     def set_normal_term(self):
         """
-         Resets to normal terminal.  On Windows this is a no-op.
+        Resets to normal terminal.  On Windows this is a no-op.
         """
 
-        if os.name == 'nt':
+        if os.name == "nt":
             pass
         else:
             termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.old_term)
@@ -63,10 +65,8 @@ class KBHit:
             Should not be called in the same program as getarrow().
         """
 
-        s = ''
-
-        if os.name == 'nt':
-            return msvcrt.getch().decode('utf-8')
+        if os.name == "nt":
+            return msvcrt.getch().decode("utf-8")
         else:
             return sys.stdin.read(1)
 
@@ -79,8 +79,8 @@ class KBHit:
         Should not be called in the same program as getch().
         """
 
-        if os.name == 'nt':
-            msvcrt.getch() # skip 0xE0
+        if os.name == "nt":
+            msvcrt.getch()  # skip 0xE0
             c = msvcrt.getch()
             vals = [72, 77, 80, 75]
 
@@ -88,14 +88,14 @@ class KBHit:
             c = sys.stdin.read(3)[2]
             vals = [65, 67, 66, 68]
 
-        return vals.index(ord(c.decode('utf-8')))
+        return vals.index(ord(c.decode("utf-8")))
 
     def kbhit(self):
         """
         Returns True if keyboard character was hit, False otherwise.
         """
-        if os.name == 'nt':
+        if os.name == "nt":
             return msvcrt.kbhit()
         else:
-            dr,dw,de = select([sys.stdin], [], [], 0)
+            dr, dw, de = select([sys.stdin], [], [], 0)
             return dr != []
