@@ -174,7 +174,7 @@ class Bank(BaseClass):
         # TODO: Write something like the below:
         if amount > self.balance:
             message = (
-                f"Transfer Failed: "
+                "Transfer Failed: "
                 f"The amount of money needed to transfer is more than asset of the branch #{self.id}."
             )
             if show_error:

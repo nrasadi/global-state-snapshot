@@ -100,7 +100,7 @@ class BaseClass:
     """
 
     def _log(
-        self, message, stdio: bool = True, in_file: bool = False, file_mode: str = "a+"
+        self, message, stdio: bool = True, in_file: bool = False, file_mode: str = "a"
     ):
         prefix = datetime.now().strftime("%Y-%m-%d:%H:%M:%S ")
 
