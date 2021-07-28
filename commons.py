@@ -115,5 +115,5 @@ class BaseClass:
 
     def _id_to_index(self, bid: int):
         for i, branch in enumerate(self.branches):
-            if branch["_id"] == bid:
+            if branch["id"] == bid:
                 return i

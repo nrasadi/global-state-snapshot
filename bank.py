@@ -233,7 +233,7 @@ class Bank(BaseClass):
 
         with ThreadPoolExecutor(thread_name_prefix="common_send_receive") as executor:
             for branch in self.branches:
-                branch_id = branch["_id"]
+                branch_id = branch["id"]
                 executor.submit(self._do_common_transfer, branch_id)
                 executor.submit(self._do_common_receive, branch_id)
 
