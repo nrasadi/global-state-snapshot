@@ -235,16 +235,11 @@ class Bank(BaseClass):
         receive = []
         send = []
         for branch in self.branches:
+            send.append(Thread(target=self._do_common_transfer, args=(branch["id"], ),
+                               name=f"common_transfer_to{branch['id']}_th"))
 
-            params = {
-                "target": self._do_common_transfer,
-                "args": (branch["id"],),
-                "name": f"common_transfer_to{branch['id']}_th",
-            }
-
-            send.append(Thread(**params))
-
-            receive.append(Thread(**params))
+            receive.append(Thread(target=self._do_common_receive, args=(branch["id"],),
+                                  name=f"common_receive_from{branch['id']}_th"))
 
         for th1, th2 in zip(receive, send):
             th1.start()
