@@ -1,19 +1,30 @@
 # global-state-snapshot
-Global State Snapshot through a Distributed Banking Example. In this project, we can instantiate 2 branches of a bank and transacting is performed in every 0.5 seconds. Similarly, a branch can initiate a snapshot at any time. Inspector is also present there to control them.
+It is the implementation of Chandy and Lamport's snapshot algorithm with distributed banking as an example.
+In this project, we instantiate four bank branches before the inspector records the global state, by default.
+We can change it by altering the `n_branches` variable of the `Bank` class in `bank.py`.
+The transaction is performed every 0.5 seconds by default. We can change it too by changing the `time_unit` variable in the same class.
+A branch can initiate a snapshot at any time by pressing `s` in the terminal.
 
 ### Platform 
-The project was done using Linux filesystem, for the ease of building, use a linux machine.
+Although through testing of the project was done in Arch Linux. It should run fine in other operating systems too.
 
 ### Dependencies
-- Python 3.8 (minimum)
+The project uses the libraries provided on the default installation of python.
+There aren't dependencies that you have to install via your package manager.
+However, using the `Literal` type from the `typing` module makes the minimum supported version of Python 3.8.
+Feel free to change the code to make it run on your version of python in your machine.
 
 ### Process of running code:
-1. Instantiate branches of the bank. Type the command below in two different terminals.
-```bash
+1. Instantiate at least the minimum number of branches of the bank.
+Type the command below in different terminals.
+
+```sh
 python main.py -b 
 ```
+
 2. Instantiate inspector of the bank. 
 ```bash
-python main.py -b 
+python main.py -i
 ```
-Now the code will run as a simulation. Type 's' in respective banks for snapshot.
+
+Now, the code will run as a simulation. Type 's' in respective banks for snapshot.
