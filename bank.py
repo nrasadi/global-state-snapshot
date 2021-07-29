@@ -16,12 +16,15 @@ class Bank(BaseClass):
 
     # Class Variables
     consts = Constants()
-    consts.dir_bank.mkdir() if not consts.dir_bank.is_dir() else None
+
+    if not consts.dir_bank.is_dir():
+        consts.dir_bank.mkdir()
+
     bank_file = consts.dir_bank / "bank.json"
     money_unit = "k", "Toomaan"
     time_unit = 0.5  # Seconds
     n_branches = 4
-    branches_public_details = []
+    branches_public_details: List[Mapping[str, Any]] = []
     next_id = 0
 
     # Class Methods
