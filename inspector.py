@@ -37,18 +37,21 @@ class Inspector(BaseClass):
                 break
 
         for i in range(Bank.n_branches):
+            soc = socket.socket()
+
+            id = Bank.branches_public_details[i]["id"]
+
+            soc.bind((self.address, 11_000 + id))
+            soc.listen(1)
+
             self.branches.append(
                 {
-                    "id": Bank.branches_public_details[i]["id"],
+                    "id": id,
                     "address": Bank.branches_public_details[i]["address"],
-                    "in_sock": socket.socket(socket.AF_INET, socket.SOCK_STREAM),
+                    "in_sock": soc,
                     "in_conn": None,
                 }
             )
-            self.branches[-1]["in_sock"].bind(
-                (self.address, 11000 + self.branches[-1]["id"])
-            )
-            self.branches[-1]["in_sock"].listen(1)
 
     def get_messages(self, bid: int) -> NoReturn:
 

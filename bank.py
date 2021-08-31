@@ -131,8 +131,12 @@ class Bank(BaseClass):
 
                 curr_public_details = self.branches_public_details[i]
 
-                in_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                out_conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                in_sock = socket.socket()
+
+                in_sock.bind((self.address, port))
+                in_sock.listen(1)
+
+                out_conn = socket.socket()
 
                 self.branches.append(
                     {
@@ -145,8 +149,7 @@ class Bank(BaseClass):
                         "last_message": Queue(),
                     }
                 )
-                self.branches[-1]["in_sock"].bind((self.address, port))
-                self.branches[-1]["in_sock"].listen(1)
+
 
     def _init_inspector(self) -> None:
         """
@@ -156,12 +159,12 @@ class Bank(BaseClass):
 
         while True:
             try:
-                insp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                insp_sock = socket.socket()
                 insp_sock.connect((self.inspector["address"], self.inspector["port"]))
                 self.inspector["conn"] = insp_sock
                 break
-            except Exception:
-                continue
+            except ConnectionRefusedError:
+                insp_sock.close()
 
         self._log("Connected to Inspector.")
 
