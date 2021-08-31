@@ -63,26 +63,6 @@ class KBHit:
 
         return msvcrt.getch().decode("utf-8") if os.name == "nt" else sys.stdin.read(1)
 
-    def getarrow(self) -> int:
-        """Returns an arrow-key code after kbhit() has been called. Codes are
-        0 : up
-        1 : right
-        2 : down
-        3 : left
-        Should not be called in the same program as getch().
-        """
-
-        if os.name == "nt":
-            msvcrt.getch()  # skip 0xE0
-            c = msvcrt.getch()
-            vals = [72, 77, 80, 75]
-
-        else:
-            c = sys.stdin.read(3)[2]
-            vals = [65, 67, 66, 68]
-
-        return vals.index(ord(c.decode("utf-8")))
-
     def kbhit(self) -> bool:
         """
         Returns True if keyboard character was hit, False otherwise.

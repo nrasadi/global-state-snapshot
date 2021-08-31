@@ -68,37 +68,55 @@ class Inspector(BaseClass):
                 self.received_messages.append(message)
 
             elif message["subject"] == "receive":
+
                 send_message = self.find_transfer_message(message, remove=True)
                 if send_message:
+                    time_format = "%H:%M:%S"
+                    receive_time = message["receive_time"].strftime(time_format)
+                    send_time = send_message["send_time"].strftime(time_format)
+
                     log_message = (
-                        f'sender:{send_message["sender_id"]:>2} '
-                        f'- send_time:{send_message["send_time"].strftime("%H:%M:%S ")}'
-                        f'- amount:{send_message["amount"]:>9}{Bank.money_unit[0]} {Bank.money_unit[1]} '
-                        f'- receiver:{send_message["receiver_id"]:>2}'
-                        f'- receive_time:{message["receive_time"].strftime("%H:%M:%S ")}'
+                        f'sender: {send_message["sender_id"]:2} '
+                        f"- send_time: {send_time}"
+                        f'- amount: {send_message["amount"]:9,} {Bank.money_unit} '
+                        f'- receiver: {send_message["receiver_id"]:2}'
+                        f"- receive_time: {receive_time}"
                     )
                     self._log(log_message, in_file=True)
 
             elif message["subject"] == "global_snapshot":
-
                 self.n_global_snapshots += 1
-                total_balance = 0
+                total_balance: int = 0
+
+                time_format = r"%Y-%m-%d:%H:%M:%S"
+
+                request_time = message["request_time"].strftime(time_format)
+                preparation_time = message["preparation_time"].strftime(time_format)
+
                 log_message = (
-                    "\n===========================================================================\n"
+                    "\n==================================="
+                    "========================================\n"
                     f"Global Snapshot #{self.n_global_snapshots}"
-                    f'     Request Time:{message["request_time"].strftime("%Y-%m-%d:%H:%M:%S")}'
-                    f'     Preparation Time:{message["preparation_time"].strftime("%Y-%m-%d:%H:%M:%S")}'
+                    f"\tRequest Time: {request_time}"
+                    f"\tPreparation Time: {preparation_time}"
                 )
                 for snapshot in message["local_snapshots"]:
+
+                    balance: int = snapshot["balance"]
+                    in_channels: int = snapshot["in_channels"]
+
                     log_message += (
-                        f'\nBranch {snapshot["id"]:>2}: '
-                        f'Balance:{snapshot["balance"]:>9}{Bank.money_unit[0]} {Bank.money_unit[1]}'
-                        f' - In Channels: {snapshot["in_channels"]:>9}{Bank.money_unit[0]}'
-                        f" {Bank.money_unit[1]}"
+                        f'\nBranch {snapshot["id"]:2}: '
+                        f"Balance: {balance:9,} {Bank.money_unit}"
+                        f" - In Channels: {in_channels:9}"
+                        f" {Bank.money_unit}"
                     )
-                    total_balance += snapshot["balance"] + snapshot["in_channels"]
-                log_message += f"\nTotal Balance: {total_balance}{Bank.money_unit[0]} {Bank.money_unit[1]}"
-                log_message += "\n===========================================================================\n"
+                    total_balance += balance + in_channels
+                log_message += (
+                    f"\nTotal Balance: {total_balance:,} {Bank.money_unit}"
+                    "\n======================================"
+                    "=====================================\n"
+                )
 
                 self._log(log_message, in_file=True)
 
@@ -106,15 +124,16 @@ class Inspector(BaseClass):
         self, message: Mapping[str, Any], remove: bool = True
     ) -> Optional[Mapping[str, Any]]:
 
-        with self.lock:
-            for i, prev_message in enumerate(self.received_messages):
-                if (
-                    prev_message["amount"] == message["amount"]
-                    and prev_message["sender_id"] == message["sender_id"]
-                    and prev_message["receiver_id"] == message["receiver_id"]
-                ):
-
-                    return self.received_messages.pop(i) if remove else prev_message
+        for i, prev_message in enumerate(self.received_messages):
+            if (
+                prev_message["amount"] == message["amount"]
+                and prev_message["sender_id"] == message["sender_id"]
+                and prev_message["receiver_id"] == message["receiver_id"]
+            ):
+                if remove:
+                    with self.lock:
+                        del self.received_messages[i]
+                return prev_message
 
     def run(self) -> None:
         with ThreadPoolExecutor() as executor:

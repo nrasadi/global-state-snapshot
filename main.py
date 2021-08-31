@@ -47,10 +47,8 @@ if __name__ == "__main__":
     if args.bank and args.inspector:
         raise "You must only use one option."
     elif args.bank:
-        branch = Bank()
-        branch.run()
+        Bank().run()
     elif args.inspector:
-        inspector = Inspector()
-        inspector.run()
+        Inspector().run()
     else:
         raise "Use one of the options (-b or -i)"
