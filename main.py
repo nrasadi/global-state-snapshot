@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     if args.clear:
         try:
-            os.remove(str(Bank.bank_file))
+            os.remove(Bank.bank_file)
             print("Bank information file removed.")
         except FileNotFoundError:
             print("File not found. It has already been removed.")

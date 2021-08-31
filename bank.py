@@ -30,22 +30,21 @@ class Bank(BaseClass):
     # Class Methods
     @staticmethod
     def load_class_vars() -> None:
+        if not Bank.bank_file.is_file():
+            Bank.next_id = 0
+            Bank.branches_public_details = []
+            return
 
         while True:
             try:
-                if not Bank.bank_file.is_file():
-                    Bank.next_id = 0
-                    Bank.branches_public_details = []
-                    return
-
                 with open(Bank.bank_file, "r") as f:
                     bank_vars = json.load(f)
+                break
+            except json.JSONDecodeError:
+                pass
 
-                Bank.next_id = len(bank_vars["branch_details"])
-                Bank.branches_public_details = bank_vars["branch_details"]
-                return
-            except Exception:
-                continue
+        Bank.next_id = len(bank_vars["branch_details"])
+        Bank.branches_public_details = bank_vars["branch_details"]
 
     @staticmethod
     def save_class_vars() -> None:
@@ -150,7 +149,6 @@ class Bank(BaseClass):
                     }
                 )
 
-
     def _init_inspector(self) -> None:
         """
         Initiates the connection between this branch and the inspector
@@ -217,12 +215,13 @@ class Bank(BaseClass):
         """
         send_time = datetime.now()
 
+        message = pickle.dumps(message)
+
         try:
-            message = pickle.dumps(message)
             with self.lock:
                 conn.sendall(message)
             status = True
-        except Exception:
+        except BrokenPipeError:
             status = False
 
         return {
