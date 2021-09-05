@@ -18,6 +18,7 @@ class Inspector:
         self.ports = np.arange(Bank.n_branches) + 11000
         self.branches = []
         self.received_messages = []
+        self.sent_messages = []
         self.lock = threading.Lock()
         self.n_global_snapshots = 0
 
@@ -62,15 +63,24 @@ class Inspector:
             if message["subject"] == "send":
                 self.received_messages.append(message)
 
+                crspnd_msg = self.find_transfer_message(
+                    message,
+                    send_msg=True,
+                    remove=True)
+
+                if crspnd_msg:
+                    crspnd_msg["send_time"] = message["send_time"]
+
             elif message["subject"] == "receive":
-                send_message = self.find_transfer_message(message, remove=True)
-                if send_message:
-                    log_message = f'sender:{send_message["sender_id"]:>2} ' \
-                                  f'- send_time:{send_message["send_time"].strftime("%H:%M:%S ")}' \
-                                  f'- amount:{send_message["amount"]:>9}{Bank.money_unit[0]} {Bank.money_unit[1]} ' \
-                                  f'- receiver:{send_message["receiver_id"]:>2}' \
-                                  f'- receive_time:{message["receive_time"].strftime("%H:%M:%S ")}'
-                    self._log(log_message, in_file=True)
+                self.sent_messages.append(message)
+
+                crspnd_msg = self.find_transfer_message(
+                    message,
+                    send_msg=False,
+                    remove=True)
+
+                if crspnd_msg:
+                    crspnd_msg["receive_time"] = message["receive_time"]
 
             elif message["subject"] == "global_snapshot":
 
@@ -91,25 +101,44 @@ class Inspector:
 
                 self._log(log_message, in_file=True)
 
-    def find_transfer_message(self, message, remove=True):
+            if crspnd_msg:
+                time_format = "%H:%M:%S"
+                log_message = (
+                    f'sender: {crspnd_msg["sender_id"]:>2} - '
+                    f'send_time: '
+                    f'{crspnd_msg["send_time"].strftime(time_format)}'
+                    f' - amount:{crspnd_msg["amount"]:>9}'
+                    f'{Bank.money_unit[0]} {Bank.money_unit[1]}'
+                    f' - receiver:{crspnd_msg["receiver_id"]:>2}'
+                    f' - receive_time: '
+                    f'{crspnd_msg["receive_time"].strftime(time_format)}')
+
+                self._log(log_message, in_file=True)
+                crspnd_msg = None
+
+    def find_transfer_message(self, message, send_msg: bool=False,remove=True):
 
         self.lock.acquire()
-        send_message = False
-        for i, prev_message in enumerate(self.received_messages):
+
+        corresponding_message = False
+        query_list = self.sent_messages if send_msg else self.received_messages
+
+        for i, prev_message in enumerate(query_list):
+
             if prev_message["amount"] == message["amount"] and \
-                            prev_message["sender_id"] == message["sender_id"] and \
-                            prev_message["receiver_id"] == message["receiver_id"]:
+                prev_message["sender_id"] == message["sender_id"] and \
+                prev_message["receiver_id"] == message["receiver_id"]:
 
                 if remove:
-                    send_message = self.received_messages.pop(i)
+                    corresponding_message = query_list.pop(i)
                 else:
-                    send_message = self.received_messages[i]
+                    corresponding_message = query_list[i]
 
                 self.lock.release()
-                return send_message
+                return corresponding_message
 
         self.lock.release()
-        return send_message
+        return corresponding_message
 
     def run(self):
 
@@ -122,7 +151,7 @@ class Inspector:
 
 
     def _log(self, message, stdio=True, in_file=False, file_mode="a+"):
-        prefix = datetime.now().strftime("%Y-%m-%d:%H:%M:%S ")
+        prefix = datetime.now().strftime("%Y-%m-%d:%H:%M:%S - ")
 
         if stdio:
             print(prefix + str(message))
@@ -133,3 +162,4 @@ class Inspector:
 
     def _id_to_index(self, bid):
         return [i for i, branch in enumerate(self.branches) if branch["id"]==bid][0]
+
