@@ -342,7 +342,6 @@ class Bank:
         kb = KBHit()
         self._log(
         "TO GET A SNAPSHOT -> Enter 's' \n"
-        "To Quit -> Enter 'q'"
         )
         while True:
             if kb.kbhit():
@@ -354,7 +353,8 @@ class Bank:
                     # do snapshot
                     break
 
-                if "q" in character:
+                # TODO: implement global quit
+                elif "q" in character:
                     self._log("Initiating a snapshot.", in_file=True)
                     kb.set_normal_term()
 
