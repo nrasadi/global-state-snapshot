@@ -1,4 +1,8 @@
 import os
+from pathlib import Path
+from datetime import datetime
+
+import yaml
 
 # Windows
 if os.name == 'nt':
@@ -10,13 +14,12 @@ else:
     import atexit
     from select import select
 
-from pathlib import Path
-from datetime import datetime
 
 
 class Constants:
     dir_logs = Path("logs/")
     dir_bank = Path("bank/")
+    config_file = Path('config.yml')
 
 class KBHit:
 
@@ -125,3 +128,19 @@ class BaseClass:
         for i, branch in enumerate(self.branches):
             if branch["id"] == bid:
                 return i
+
+
+    def get_config(self, path=None):
+        """
+        Gets and prepares configurations from yaml config file
+        """
+
+        if path is None:
+            path = Constants.config_file
+
+        with open(path, 'r') as yaml_file:
+            self.config = yaml.load(yaml_file, Loader=yaml.FullLoader)
+
+        self.brnch_confs = self.config['branches']
+        self.bank_confs = self.config['bank']
+        self.inspctr_confs = self.config['inspector']

@@ -16,9 +16,6 @@ class Bank(BaseClass):
     consts = Constants()
     consts.dir_bank.mkdir() if not consts.dir_bank.is_dir() else None
     bank_file = consts.dir_bank / "bank.json"
-    money_unit = "k", "Toomaan"
-    time_unit = 0.5  # Seconds
-    n_branches = 2
     branches_public_details = []
     next_id = 0
 
@@ -51,20 +48,35 @@ class Bank(BaseClass):
             json.dump({"branch_details":Bank.branches_public_details}, f)
 
 
-    def __init__(self, balance=None, address=None, port=None, max_number_of_send=1000):
+    def __init__(
+        self,
+        id=None,
+        balance=1_000_000,
+        address='localhost',
+        max_number_of_send=1_000
+    ):
 
         self._log("Initiating ...")
+
+        self.get_config()
+
+        self.n_branches = len(self.brnch_confs)
 
         Bank.load_class_vars()
 
         self.lock = Lock()
         self.branches = []
-        self.processes = []
-        self.recv_queue = [Queue() for _ in range(Bank.n_branches)]
+        self.recv_queue = [Queue() for _ in range(self.n_branches)]
         self.id = Bank.next_id
         Bank.next_id += 1
-        self.balance = 10000000 if balance is None else balance
-        self.max_n_send = max_number_of_send
+
+        self.balance = self.bank_confs['initial_balance']
+        if self.balance is None:
+            self.balance = balance
+
+        self.max_n_send = self.bank_confs['max_n_send']
+        if self.max_n_send is None:
+            self.max_n_send = max_number_of_send
 
         Bank.consts.dir_logs.mkdir() if not Bank.consts.dir_logs.is_dir() else None
         self.log_database = Bank.consts.dir_logs / f"branch_{self.id}.log"
@@ -75,14 +87,20 @@ class Bank(BaseClass):
         self.local_snapshots = []
         self.got_marker = False
 
-        self.address = "localhost" if address is None else address
-        self.port_base = 9900 + self.id * 10 if port is None else port
+        self.address = self.brnch_confs[self.id]['address']
+        if self.address is None:
+            self.address = address
 
         Bank.branches_public_details.append({"id": self.id, "address": self.address})
         Bank.save_class_vars()
 
         self._init_other_branches()
-        self.inspector = {"port": 11000 + self.id, "address": "localhost", "conn": None}
+
+        self.inspector = {
+            "port": self.inspctr_confs['port_base_out'] + self.id,
+            "address": self.inspctr_confs['address'],
+            "conn": None}
+
         self._init_inspector()
 
         self._log(f"BRANCH {self.id} LOG\n", in_file=True, stdio=False, file_mode="w")
@@ -107,16 +125,20 @@ class Bank(BaseClass):
         while True:
             Bank.load_class_vars()
 
-            if len(Bank.branches_public_details) == Bank.n_branches:
-                self._log(f"All {Bank.n_branches} branches are open now. Resuming the process ...")
+            if len(Bank.branches_public_details) == self.n_branches:
+                self._log(
+                    f"All {self.n_branches} branches are open now. "
+                     "Resuming the process ...")
                 break
 
-        for i in range(Bank.n_branches):
+        for i in range(self.n_branches):
             if i != self.id:
-                port =  9900 + self.id + i * 10
+                port =  self.brnch_confs[i]['port_base_in'] + self.id + i * 10
+                port_out = self.brnch_confs[self.id]['port_base_out'] \
+                         + self.id  * 10 + i
                 self.branches.append({
                     "id": Bank.branches_public_details[i]["id"],
-                    "port": 9900 + self.id  * 10 + i,
+                    "port": port_out,
                     "address": Bank.branches_public_details[i]["address"],
                     "in_sock": socket.socket(socket.AF_INET, socket.SOCK_STREAM),
                     "in_conn": None,
@@ -156,10 +178,13 @@ class Bank(BaseClass):
         """
         # TODO: Write something like the below:
         if amount > self.balance:
-            message =f"Transfer Failed: " \
-                     f"The amount of money needed to transfer is more than asset of the branch #{self.id}."
+            message = (f"Transfer Failed: "
+                        f"The amount of money needed to transfer "
+                        "is more than assets of the branch #{self.id}.")
+
             if show_error:
                 self._log(message, in_file=True)
+
             # raise message
             return {"status": False}
 
@@ -170,8 +195,24 @@ class Bank(BaseClass):
         if result["status"]:
             self.balance -= amount
 
-        self._log(f"Branch {self.id}: {amount:>4}{Bank.money_unit[0]} {Bank.money_unit[1]} Transferred TO the branch "
-                  f"{receiver['id']:>2}. (send_time:{result['send_time']})", in_file=True)
+        time_format = "%Y-%m-%d:%H:%M:%S"
+        c_sign = self.bank_confs['currency']['symbol']
+        c_unit = self.bank_confs['currency']['unit']
+        s_place = self.bank_confs['currency']['placement']
+        sign_before = f'{c_sign if s_place == "before" else ""}'
+        sign_after = f'{c_sign if s_place == "after" else ""}'
+        merged_unit_sign_after = c_unit + ' ' + sign_after
+        self._log(
+            f'Branch {self.id}: '
+            f'{sign_before}'
+            f'{amount}'
+            # f'{c_unit:<4} '
+            # f'{sign_after} '
+            f'{merged_unit_sign_after:<6}'
+            f'Transferred TO the branch '
+            f'{receiver["id"]:>2}. '
+            f'(send_time:{result["send_time"].strftime(time_format)})',
+            in_file=True)
 
         return result
 
@@ -249,6 +290,9 @@ class Bank(BaseClass):
         receiver = self.branches[receiver_id]
 
         max_n_send = self.max_n_send
+        p_trnsction = self.bank_confs['transaction']['p']
+        min_amount = self.bank_confs['transaction']['min']
+        max_amount = self.bank_confs['transaction']['max']
         while True:
             if max_n_send == 0:
                 self._log(
@@ -258,10 +302,10 @@ class Bank(BaseClass):
 
                 return
 
-            sleep(Bank.time_unit)
+            sleep(self.bank_confs['time_step'])
 
-            if random.random() <= 0.3:
-                amount = random.randint(1, 1000)
+            if random.random() <= p_trnsction:
+                amount = random.randint(min_amount, max_amount)
                 result = self.transfer(amount, receiver, show_error=True)
 
                 if result["status"]:
@@ -280,10 +324,16 @@ class Bank(BaseClass):
     def _do_common_receive(self, sender_id):
         """
         Receives an amount of money from a branch with a specific id (in_soc_id).
-        It also checks whether a snapshot request has been sent or not. If true, it will toggle on snapshot flag.
-        :param sender_id: The id of sender information. The sender itself is a dictionary which its keys are same as the self.branch:
-            [id:integer, "port": integer, "address": string,
-            "in_sock": socket, "in_conn": input socket connection, "out_conn": output socket connection]
+        It also checks whether a snapshot request has been sent or not.
+        If true, it will toggle on snapshot flag.
+        :param sender_id: The id of sender information.
+        The sender itself is a dictionary which its keys are same as the self.branch:
+            [id:integer,
+            "port": integer,
+            "address": string,
+            "in_sock": socket,
+            "in_conn": input socket connection,
+            "out_conn": output socket connection]
         :return:
         """
 
@@ -291,14 +341,17 @@ class Bank(BaseClass):
         recv_messages_th.start()
 
         sender_index = self._id_to_index(sender_id)
-
         sender = self.branches[sender_index]
+
+        min_delay = self.brnch_confs[self.id]['delay']['min']
+        max_delay = self.brnch_confs[self.id]['delay']['max']
+        time_step = self.bank_confs['time_step']
 
         while True:
             if not self.recv_queue[sender_index].empty():
                 message = self.recv_queue[sender_index].get()
-                # Add an intentional delay to simulate end-to-end connection latency.
-                sleep(Bank.time_unit * random.randint(1, 10))
+                # Add an intentional delay to simulate connection latency.
+                sleep(time_step * random.randint(min_delay, max_delay))
             else:
                 continue
 
@@ -307,6 +360,7 @@ class Bank(BaseClass):
             if message["subject"].lower() == "transfer":
                 amount += message["amount"]
                 self.balance += amount
+
                 message_to_insp = {
                     "subject": "receive",
                     "amount": message["amount"],
@@ -324,6 +378,7 @@ class Bank(BaseClass):
             last_message = {"recv_time": recv_time, "amount": amount, "subject": message["subject"]}
             if "initiator" in message.keys():
                 last_message["initiator"] = message["initiator"]
+
             self.branches[sender_index]["last_message"].put(last_message)
 
     def _recv_messages(self, sender_id):
@@ -396,7 +451,7 @@ class Bank(BaseClass):
         }
 
         while True:
-            if len(self.local_snapshots) == Bank.n_branches - 1:
+            if len(self.local_snapshots) == self.n_branches - 1:
                 break
 
         self.local_snapshots.append(local_snapshot)
@@ -432,7 +487,7 @@ class Bank(BaseClass):
                 return 0
 
             if self.branches[branch_idx]["last_message"].empty():
-                branch_idx = (branch_idx + 1) % (Bank.n_branches - 1)
+                branch_idx = (branch_idx + 1) % (self.n_branches - 1)
                 continue
 
             last_message = self.branches[branch_idx]["last_message"].get()
@@ -440,7 +495,7 @@ class Bank(BaseClass):
                 sender_index = branch_idx
                 break
 
-            branch_idx = (branch_idx + 1) % (Bank.n_branches - 1)
+            branch_idx = (branch_idx + 1) % (self.n_branches - 1)
 
         self._log(f"Branch {self.branches[sender_index]['id']} has sent a snapshot request. "
                   f"(Initiator: Branch {last_message['initiator']})", in_file=True)

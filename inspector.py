@@ -10,16 +10,23 @@ from bank import Bank
 
 class Inspector(BaseClass):
 
-    def __init__(self, address=None):
+    def __init__(self, address='localhost'):
 
-        self.address = "localhost" if address is None else address
+        self.get_config()
+
+        self.address = self.inspctr_confs['address']
+        if self.address is None:
+            self.address = address
+
+        self.n_branches = len(self.brnch_confs)
+
         self.branches = []
         self.received_messages = []
         self.sent_messages = []
         self.lock = threading.Lock()
         self.n_global_snapshots = 0
 
-        self.log_database = Constants.dir_logs / "inspector.log"
+        self.log_database = Constants.dir_logs / self.inspctr_confs['log_file']
 
         self.connect_to_branches()
 
@@ -31,25 +38,36 @@ class Inspector(BaseClass):
 
         while True:
             Bank.load_class_vars()
-            if len(Bank.branches_public_details) == Bank.n_branches:
-                self._log(f"All {Bank.n_branches} branches are open now. Resuming the process.")
+            if len(Bank.branches_public_details) == self.n_branches:
+                self._log(f"All {self.n_branches} branches are open now. Resuming the process.")
                 break
 
-        for i in range(Bank.n_branches):
+        for i in range(self.n_branches):
             self.branches.append({
                 "id": Bank.branches_public_details[i]["id"],
                 "address": Bank.branches_public_details[i]["address"],
                 "in_sock": socket.socket(socket.AF_INET, socket.SOCK_STREAM),
                 "in_conn": None
             })
-            self.branches[-1]["in_sock"].bind((self.address, 11000 + self.branches[-1]["id"]))
+
+            port_in = self.inspctr_confs['port_base_in'] + self.branches[-1]["id"]
+            self.branches[-1]["in_sock"].bind((self.address, port_in))
             self.branches[-1]["in_sock"].listen(1)
 
     def get_messages(self, bid):
 
         bid = self._id_to_index(bid)
 
-        self.branches[bid]["in_conn"], self.branches[bid]["address"] = self.branches[bid]["in_sock"].accept()
+        self.branches[bid]["in_conn"], self.branches[bid]["address"] \
+            = self.branches[bid]["in_sock"].accept()
+
+        time_format = "%Y-%m-%d:%H:%M:%S"
+        c_sign = self.bank_confs['currency']['symbol']
+        c_unit = self.bank_confs['currency']['unit']
+        s_place = self.bank_confs['currency']['placement']
+        sign_before = f'{c_sign if s_place == "before" else ""}'
+        sign_after = f'{c_sign if s_place == "after" else ""}'
+        merged_unit_sign_after = c_unit + ' ' + sign_after
 
         while True:
             pickled_data = self.branches[bid]["in_conn"].recv(4096)
@@ -83,18 +101,42 @@ class Inspector(BaseClass):
 
                 self.n_global_snapshots += 1
                 total_balance = 0
-                log_message = '\n===========================================================================\n' \
-                              f'Global Snapshot #{self.n_global_snapshots}' \
-                              f'     Request Time:{message["request_time"].strftime("%Y-%m-%d:%H:%M:%S")}' \
-                              f'     Preparation Time:{message["preparation_time"].strftime("%Y-%m-%d:%H:%M:%S")}'
+                log_message = (
+                    '\n=============================================='
+                    '=============================\n'
+                    f'Global Snapshot #{self.n_global_snapshots}'
+                    f'\tRequest Time:'
+                    f'{message["request_time"].strftime(time_format)}'
+                    f'\tPreparation Time:'
+                    f'{message["preparation_time"].strftime(time_format)}')
+
                 for snapshot in message["local_snapshots"]:
-                    log_message += f'\nBranch {snapshot["id"]:>2}: ' \
-                                 f'Balance:{snapshot["balance"]:>9}{Bank.money_unit[0]} {Bank.money_unit[1]}' \
-                                 f' - In Channels: {snapshot["in_channels"]:>9}{Bank.money_unit[0]}' \
-                                 f' {Bank.money_unit[1]}'
+                    log_message += (
+                        f'\nBranch {snapshot["id"]:>2}: Balance:'
+                        f'{sign_before}'
+                        f'{snapshot["balance"]}'
+                        # f'{c_unit:<9} '
+                        # f'{sign_after} '
+                        f'{merged_unit_sign_after:<8}'
+                        f'- In Channels: '
+                        f'{sign_before}'
+                        f'{snapshot["in_channels"]}'
+                        # f'{c_unit:<9} '
+                        # f'{sign_after}')
+                        f'{merged_unit_sign_after:<6}')
+
                     total_balance += snapshot["balance"] + snapshot["in_channels"]
-                log_message += f"\nTotal Balance: {total_balance}{Bank.money_unit[0]} {Bank.money_unit[1]}"
-                log_message += '\n===========================================================================\n'
+
+                log_message += (
+                    f'\nTotal Balance: '
+                    f'{sign_before}'
+                    f'{total_balance}'
+                    # f'{c_unit:<9} '
+                    # f'{sign_after}')
+                    f'{merged_unit_sign_after:<9}')
+
+                log_message += ('\n============================================='
+                    '==============================\n')
 
                 self._log(log_message, in_file=True)
 
@@ -104,8 +146,12 @@ class Inspector(BaseClass):
                     f'sender: {crspnd_msg["sender_id"]:>2} - '
                     f'send_time: '
                     f'{crspnd_msg["send_time"].strftime(time_format)}'
-                    f' - amount:{crspnd_msg["amount"]:>9}'
-                    f'{Bank.money_unit[0]} {Bank.money_unit[1]}'
+                    f' - amount:'
+                    f'{sign_before}'
+                    f'{crspnd_msg["amount"]}'
+                    # f'{c_unit:<9} '
+                    # f'{sign_after}'
+                    f'{merged_unit_sign_after:<4}'
                     f' - receiver:{crspnd_msg["receiver_id"]:>2}'
                     f' - receive_time: '
                     f'{crspnd_msg["receive_time"].strftime(time_format)}')
@@ -140,8 +186,8 @@ class Inspector(BaseClass):
     def run(self):
 
         threads = []
-        for i in range(Bank.n_branches):
+        for i in range(self.n_branches):
             threads.append(Thread(target=self.get_messages, args=(i, )))
             threads[-1].start()
-        for i in range(Bank.n_branches):
+        for i in range(self.n_branches):
             threads[i].join()

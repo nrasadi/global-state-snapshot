@@ -1,0 +1,56 @@
+bank:
+  currency:
+    unit: 'k'
+    symbol: '$'
+    # placenemt can be before or after.
+    # e.g. in $500k dollar symbol is before value
+    placement: 'after'
+
+  transaction:
+    # min and max random amount of each transaction
+    min: 1
+    max: 1000
+    # probability to decide whether to transfer money to a specific branch
+    p: 0.3
+
+  time_step: 0.5 # transactions are performed every `time_step` seconds.
+
+  # maximum number of transactions between two branches (only send messages)
+  max_n_send: 1000
+
+  initial_balance: 1000000 # initial capital of each branch
+
+# branches information
+# also, number of branches is inferred from following information
+branches:
+    # ip address
+  - address: 'localhost'
+    # port for incoming messages
+    # port number will be: post_base_in + branch_id + (linked_branch_id * 10)
+    port_base_in: 9900
+    # port for outgoing messages
+    # port number will be: post_base_out + (branch_id * 10) + linked_branch_id
+    port_base_out: 9900
+    delay: # random delay of one-way connection latency from this branch
+      min: 1
+      max: 10
+
+  - address: 'localhost'
+    port_base_in: 9900
+    port_base_out: 9900
+    delay:
+      min: 1
+      max: 10
+
+  - address: 'localhost'
+    port_base_in: 9900
+    port_base_out: 9900
+    delay:
+      min: 1
+      max: 10
+
+inspector:
+  address: 'localhost'
+  port_base_in: 11000
+  port_base_out: 11000
+  log_file: 'inspector.log'
