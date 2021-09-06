@@ -201,8 +201,8 @@ class Bank:
 
     def do_common(self):
         """
-        It does the common procedure of the program including transferring money and
-        receiving messages from the other branches.
+        It does the common procedure of the program including transferring money
+        and receiving messages from the other branches.
         All procedures are completely asynchronous.
         It calls two other methods per each thread:
             _do_common_transfer: transfer procedure
@@ -340,15 +340,24 @@ class Bank:
     def _init_snapshot(self):
 
         kb = KBHit()
-        self._log("TO GET A SNAPSHOT -> Type 's' \n")
+        self._log(
+        "TO GET A SNAPSHOT -> Enter 's' \n"
+        "To Quit -> Enter 'q'"
+        )
         while True:
             if kb.kbhit():
-                do_snapshot = kb.getch()
+                character = kb.getch().lower()
 
-                if "s" in do_snapshot.lower():
+                if "s" in character:
                     self._log("Initiating a snapshot.", in_file=True)
                     kb.set_normal_term()
+                    # do snapshot
                     break
+
+                if "q" in character:
+                    self._log("Initiating a snapshot.", in_file=True)
+                    kb.set_normal_term()
+
 
             if self.got_marker:
                 kb.set_normal_term()
@@ -456,8 +465,9 @@ class Bank:
                 self._log(f"Sent marker TO {branch['id']}", in_file=True)
 
             if branch_idx != exclude_index:
-                threads.append(Thread(target=lambda q, arg1: q.put(self._inspect_channel(arg1)),
-                                      args=(que, branch["id"],)))
+                target = lambda q, arg1: q.put(self._inspect_channel(arg1))
+                threads.append(Thread(target=target,
+                                      args=(que, branch["id"])))
                 threads[-1].start()
 
         for th in threads:
