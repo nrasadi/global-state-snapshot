@@ -4,8 +4,7 @@ from queue import Queue
 from datetime import datetime
 from time import sleep
 import socket
-
-import numpy as np
+import random
 import json
 
 from commons import Constants, KBHit
@@ -19,7 +18,7 @@ class Bank:
     bank_file = consts.dir_bank / "bank.json"
     money_unit = "k", "Toomaan"
     time_unit = 0.5  # Seconds
-    n_branches = 4
+    n_branches = 2
     branches_public_details = []
     next_id = 0
 
@@ -247,8 +246,8 @@ class Bank:
 
             sleep(Bank.time_unit)
 
-            if np.random.random() <= 0.3:
-                amount = np.random.randint(1, 1001)
+            if random.random() <= 0.3:
+                amount = random.randint(1, 1000)
                 result = self.transfer(amount, receiver, show_error=True)
 
                 if result["status"]:
@@ -285,7 +284,7 @@ class Bank:
             if not self.recv_queue[sender_index].empty():
                 message = self.recv_queue[sender_index].get()
                 # Add an intentional delay to simulate end-to-end connection latency.
-                sleep(Bank.time_unit * np.random.randint(1, 11))
+                sleep(Bank.time_unit * random.randint(1, 10))
             else:
                 continue
 

@@ -3,8 +3,7 @@ import threading
 from threading import Thread
 from datetime import datetime
 import socket
-
-import numpy as np
+import random
 
 from commons import Constants
 from bank import Bank
@@ -15,7 +14,6 @@ class Inspector:
     def __init__(self, address=None):
 
         self.address = "localhost" if address is None else address
-        self.ports = np.arange(Bank.n_branches) + 11000
         self.branches = []
         self.received_messages = []
         self.sent_messages = []
@@ -162,4 +160,3 @@ class Inspector:
 
     def _id_to_index(self, bid):
         return [i for i, branch in enumerate(self.branches) if branch["id"]==bid][0]
-
