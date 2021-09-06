@@ -139,8 +139,8 @@ class Bank:
                 insp_sock.connect((self.inspector["address"], self.inspector["port"]))
                 self.inspector["conn"] = insp_sock
                 break
-            except:
-                continue
+            except ConnectionRefusedError:
+                insp_sock.close()
 
         self._log("Connected to Inspector.")
 
