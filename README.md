@@ -31,3 +31,18 @@ python main.py -i
 ```
 
 Now, the code will run as a simulation. Type 's' in respective banks for snapshot.
+
+### Logs
+
+All transfer messages get logged into `logs/` directory. Each branch has its own log file. Same is true for the inspector.
+
+### Next Runs
+When you open enough terminals and run the program, it creates two directories:
+    - `logs/` (as mentioned above)
+    - `bank/`: public information of each branch, e.g., its id and ip address is keeped here.
+
+**Note:** When you want to run the program again, you need to remove these two directories.
+It can be done using the following command:
+```shell
+python main.py -c
+```
