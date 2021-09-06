@@ -20,7 +20,7 @@ class Inspector:
         self.lock = threading.Lock()
         self.n_global_snapshots = 0
 
-        self.log_database = Constants.dir_root / "inspector.log"
+        self.log_database = Constants.dir_logs / "inspector.log"
 
         self.connect_to_branches()
 

@@ -1,16 +1,15 @@
 import argparse
-import os
+import shutil
 
 from bank import Bank
 from inspector import Inspector
+from commons import Constants
 
 if __name__ == '__main__':
 
     # create and parse arguments
     ap = argparse.ArgumentParser()
 
-    # ap.add_argument("-d", "--id", required=True, type=int,
-    #                 help="Id of the branch")
     ap.add_argument("-b", "--bank", required=False, action='store_true',
                     help="Use this option to run an instance of Bank (a branch).")
     ap.add_argument("-i", "--inspector", required=False, action='store_true',
@@ -22,10 +21,11 @@ if __name__ == '__main__':
 
     if args.clear:
         try:
-            os.remove(str(Bank.bank_file))
-            print("Bank information file removed.")
+            shutil.rmtree(Constants.dir_logs)
+            shutil.rmtree(Constants.dir_bank)
+            print("bank/ and logs/ directories were removed.")
         except FileNotFoundError:
-            print("File not found. It has already been removed.")
+            print("directories do not exist. They were already removed.")
 
         exit(0)
 

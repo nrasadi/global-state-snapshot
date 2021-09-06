@@ -66,8 +66,8 @@ class Bank:
         self.balance = 10000000 if balance is None else balance
         self.max_n_send = max_number_of_send
 
-        Bank.consts.dir_root.mkdir() if not Bank.consts.dir_root.is_dir() else None
-        self.log_database = Bank.consts.dir_root / f"branch_{self.id}.log"
+        Bank.consts.dir_logs.mkdir() if not Bank.consts.dir_logs.is_dir() else None
+        self.log_database = Bank.consts.dir_logs / f"branch_{self.id}.log"
 
         self._log(f"Branch {self.id} started working.", in_file=True, file_mode='w')
 
