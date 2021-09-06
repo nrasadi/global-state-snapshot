@@ -504,10 +504,16 @@ class Bank:
         for th in threads:
             th.join()
 
-        t1 = Thread(target=self.do_common, name="do_common_th")
-        t2 = Thread(target=self.snapshot_process, name="snapshot_process_th")
-        t1.start()
-        t2.start()
+        threads = []
+        threads.append(Thread(target=self.do_common, name="do_common_th"))
+        threads.append(
+            Thread(target=self.snapshot_process, name="snapshot_process_th"))
+
+        for th in threads:
+            th.start()
+
+        for th in threads:
+            th.join()
 
     def _connect_to_branch(self, bid: int, mode: str):
         """
