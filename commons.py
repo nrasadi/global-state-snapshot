@@ -13,7 +13,7 @@ else:
 from pathlib import Path
 
 class Constants:
-    dir_root = Path("logs/")
+    dir_logs = Path("logs/")
     dir_bank = Path("bank/")
 
 class KBHit:
