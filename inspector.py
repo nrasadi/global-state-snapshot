@@ -1,15 +1,14 @@
 import pickle
 import threading
-from threading import Thread
-from datetime import datetime
 import socket
 import random
+from threading import Thread
 
-from commons import Constants
+from commons import Constants, BaseClass
 from bank import Bank
 
 
-class Inspector:
+class Inspector(BaseClass):
 
     def __init__(self, address=None):
 
@@ -146,17 +145,3 @@ class Inspector:
             threads[-1].start()
         for i in range(Bank.n_branches):
             threads[i].join()
-
-
-    def _log(self, message, stdio=True, in_file=False, file_mode="a+"):
-        prefix = datetime.now().strftime("%Y-%m-%d:%H:%M:%S - ")
-
-        if stdio:
-            print(prefix + str(message))
-
-        if in_file:
-            with open(self.log_database, mode=file_mode) as f:
-                f.write(prefix + str(message) + "\n")
-
-    def _id_to_index(self, bid):
-        return [i for i, branch in enumerate(self.branches) if branch["id"]==bid][0]

@@ -1,16 +1,16 @@
 import pickle
-from threading import Thread, Lock
-from queue import Queue
-from datetime import datetime
-from time import sleep
 import socket
 import random
 import json
+from datetime import datetime
+from time import sleep
+from queue import Queue
+from threading import Thread, Lock
 
-from commons import Constants, KBHit
+from commons import Constants, KBHit, BaseClass
 
 
-class Bank:
+class Bank(BaseClass):
 
     # Class Variables
     consts = Constants()
@@ -557,16 +557,3 @@ class Bank:
                 address, port = self.branches[bid]["address"], self.branches[bid]["port"]
                 self.branches[bid]["out_conn"].connect((address, port))
                 break
-
-    def _log(self, message, stdio=True, in_file=False, file_mode="a+"):
-        prefix = datetime.now().strftime("%Y%m%d-%H:%M:%S ")
-
-        if stdio:
-            print(prefix + str(message))
-
-        if in_file:
-            with open(self.log_database, mode=file_mode) as f:
-                f.write(prefix + str(message) + "\n")
-
-    def _id_to_index(self, bid):
-        return [i for i, branch in enumerate(self.branches) if branch["id"]==bid][0]

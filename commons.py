@@ -11,6 +11,8 @@ else:
     from select import select
 
 from pathlib import Path
+from datetime import datetime
+
 
 class Constants:
     dir_logs = Path("logs/")
@@ -25,7 +27,7 @@ class KBHit:
     Under LGP License.
     Made by Simon D. Levy as part of a compilation of software
     https://simondlevy.academic.wlu.edu/software/
-    Implemented here with a few modifications
+    Implemented here with a few modifications.
     """
 
     def __init__(self):
@@ -99,3 +101,27 @@ class KBHit:
         else:
             dr,dw,de = select([sys.stdin], [], [], 0)
             return dr != []
+
+
+class BaseClass:
+    """
+    Base class for both bank and inspector
+    """
+
+    def _log(self, message, stdio: bool = True, in_file: bool = False, file_mode: str = "a"):
+
+        prefix = datetime.now().strftime("%Y-%m-%d:%H:%M:%S ")
+
+        output_string = f"{prefix}{message}"
+
+        if stdio:
+            print(output_string)
+
+        if in_file:
+            with open(self.log_database, mode=file_mode) as f:
+                f.write(output_string + "\n")
+
+    def _id_to_index(self, bid: int) -> int:
+        for i, branch in enumerate(self.branches):
+            if branch["id"] == bid:
+                return i
