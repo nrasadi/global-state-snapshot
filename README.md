@@ -18,6 +18,13 @@ Feel free to change the code to make it run on your version of Python in your ma
 
 ## Instructions to Run the Code
 
+0. Clone this repository and change your current working directory.
+
+```sh
+git clone https://github.com/nrasadi/global-state-snapshot.git
+cd global-state-snapshot
+```
+
 1. Instantiate at least the minimum number of branches of the bank.
 Type the command below in different terminals.
 
