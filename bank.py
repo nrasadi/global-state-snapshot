@@ -225,14 +225,25 @@ class Bank:
 
     def _do_common_transfer(self, receiver_id):
         """
-        Transfers an amount of money in range [1, 1000] to each branch with a probability of 0.3.
+        Transfers a random amount of money with a probability, to another branch.
         After every transfer, a message will be sent to inspector.
         The Message Structure is like the example below:
-            {"subject": "send", "sender_id": 2, "receiver_id": 1, "send_time": datetime.now(), "amount": 500}
-        :param receiver_id: Id of the receiver information. The receiver itself is a dictionary that its keys are the same as the self.branch:
-            [id:integer, "port": integer, "address": string,
-            "in_sock": socket, "in_conn": input socket connection, "out_conn": output socket connection]
-        :return:
+            {"subject": "send",
+             "sender_id": 2,
+             "receiver_id": 1,
+             "send_time": datetime.now(),
+             "amount": 500}
+        :param
+            receiver_id: Id of the receiver information.
+                The receiver itself is a dictionary that its keys
+                 are the same as the self.branch:
+                 [id:integer,
+                 "port": integer,
+                 "address": string,
+                 "in_sock": socket,
+                 "in_conn": input socket connection,
+                 "out_conn": output socket connection]
+        :return: None
         """
         receiver_id = self._id_to_index(receiver_id)
         receiver = self.branches[receiver_id]
@@ -240,8 +251,11 @@ class Bank:
         max_n_send = self.max_n_send
         while True:
             if max_n_send == 0:
-                self._log(f"Reached to the maximum number of sends ({self.max_n_send} messages per branch)",
-                          in_file=True)
+                self._log(
+                    f"Reached to the maximum number of sends "
+                    f"({self.max_n_send} messages per branch)",
+                    in_file=True)
+
                 return
 
             sleep(Bank.time_unit)
