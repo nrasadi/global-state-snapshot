@@ -13,8 +13,8 @@ Although through testing of the project was done in Ubuntu and Arch Linux. It sh
 
 The project uses the libraries provided on the default installation of Python.
 There aren't dependencies that you have to install via your package manager.
-[comment]: # (However, using the `Literal` type from the `typing` module makes the minimum supported version of Python 3.8.)
-Feel free to change the code to make it run on your version of Python in your machine.
+<!-- However, using the `Literal` type from the `typing` module makes the minimum supported version of Python 3.8.-->
+Feel free to change the code to make it run on your version of Python in your machine.)
 
 ## Instructions to Run the Code
 
@@ -38,8 +38,9 @@ All transfer messages get logged into `logs/` directory. Each branch has its own
 
 ### Next Runs
 When you open enough terminals and run the program, it creates two directories:
-    - `logs/` (as mentioned above)
-    - `bank/`: public information of each branch, e.g., its id and ip address is keeped here.
+
+- `logs/` (as mentioned above)
+- `bank/`: public information of each branch, e.g., its id and ip address is keeped here.
 
 **Note:** When you want to run the program again, you need to remove these two directories.
 It can be done using the following command:
