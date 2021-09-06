@@ -12,7 +12,14 @@ Although through testing of the project was done in Ubuntu and Arch Linux. It sh
 ## Dependencies
 
 The project uses the libraries provided on the default installation of Python.
-There aren't dependencies that you have to install via your package manager.
+The only dependency is `pyyaml` which is required for reading configuration file.   
+You can install it by running the following command:
+
+```sh
+# if Python Version 2 and 3 are both installed on your system,
+# you might need to use `pip3` instead of pip
+pip install -r requirements.txt
+```
 <!-- However, using the `Literal` type from the `typing` module makes the minimum supported version of Python 3.8.-->
 Feel free to change the code to make it run on your version of Python in your machine.)
 
