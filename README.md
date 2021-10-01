@@ -58,7 +58,7 @@ Each branch has its own log file. Same is true for the inspector.
 When you open enough terminals and run the program, it creates two directories:
 
 - `logs/` (as mentioned above)
-- `bank/`: public information of each branch, e.g., its id and ip address is keeped here.
+- `bank/`: public information of each branch, e.g., its id and ip address is kept here.
 
 **Note:** When you want to run the program again, you need to remove these two directories.
 It can be done using the following command:
