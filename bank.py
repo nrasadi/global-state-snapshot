@@ -14,7 +14,10 @@ class Bank(BaseClass):
 
     # Class Variables
     consts = Constants()
-    consts.dir_bank.mkdir() if not consts.dir_bank.is_dir() else None
+
+    if not consts.dir_bank.is_dir():
+        consts.dir_bank.mkdir()
+
     bank_file = consts.dir_bank / "bank.json"
     branches_public_details = []
     next_id = 0
@@ -43,7 +46,7 @@ class Bank(BaseClass):
             json.dump({"branch_details": Bank.branches_public_details}, f)
 
     def __init__(
-        self, id=None, balance=1_000_000, address="localhost", max_number_of_send=1_000
+        self, balance=1_000_000, address="localhost", max_number_of_send=1_000
     ):
 
         self._log("Initiating ...")
@@ -68,7 +71,8 @@ class Bank(BaseClass):
         if self.max_n_send is None:
             self.max_n_send = max_number_of_send
 
-        Bank.consts.dir_logs.mkdir() if not Bank.consts.dir_logs.is_dir() else None
+        if not Bank.consts.dir_logs.is_dir():
+            Bank.consts.dir_logs.mkdir()
         self.log_database = Bank.consts.dir_logs / f"branch_{self.id}.log"
 
         self._log(f"Branch {self.id} started working.", in_file=True, file_mode="w")
@@ -248,7 +252,6 @@ class Bank(BaseClass):
         receive = []
         send = []
         for branch in self.branches:
-
             send.append(
                 Thread(
                     target=self._do_common_transfer,
@@ -639,7 +642,7 @@ class Bank(BaseClass):
                 self.branches[bid]["address"],
             ) = self.branches[bid]["in_sock"].accept()
 
-        elif mode == "client":
+        else:  # client
             while True:
                 address, port = (
                     self.branches[bid]["address"],
