@@ -1,25 +1,25 @@
 import os
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 import yaml
 
 # Windows
-if os.name == 'nt':
+if os.name == "nt":
     import msvcrt
 # Posix (Linux, OS X)
 else:
+    import atexit
     import sys
     import termios
-    import atexit
     from select import select
-
 
 
 class Constants:
     dir_logs = Path("logs/")
     dir_bank = Path("bank/")
-    config_file = Path('config.yml')
+    config_file = Path("config.yml")
+
 
 class KBHit:
 
@@ -37,7 +37,7 @@ class KBHit:
         """
         Creates a KBHit object that you can call to do various keyboard things.
         """
-        if os.name == 'nt':
+        if os.name == "nt":
             pass
         else:
             # Save the terminal settings
@@ -46,7 +46,7 @@ class KBHit:
             self.old_term = termios.tcgetattr(self.fd)
 
             # New terminal setting unbuffered
-            self.new_term[3] = (self.new_term[3] & ~termios.ICANON & ~termios.ECHO)
+            self.new_term[3] = self.new_term[3] & ~termios.ICANON & ~termios.ECHO
             termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.new_term)
 
             # Support normal-terminal reset at exit
@@ -54,10 +54,10 @@ class KBHit:
 
     def set_normal_term(self):
         """
-         Resets to normal terminal.  On Windows this is a no-op.
+        Resets to normal terminal.  On Windows this is a no-op.
         """
 
-        if os.name == 'nt':
+        if os.name == "nt":
             pass
         else:
             termios.tcsetattr(self.fd, termios.TCSAFLUSH, self.old_term)
@@ -68,12 +68,7 @@ class KBHit:
             Should not be called in the same program as getarrow().
         """
 
-        s = ''
-
-        if os.name == 'nt':
-            return msvcrt.getch().decode('utf-8')
-        else:
-            return sys.stdin.read(1)
+        return msvcrt.getch().decode("utf-8") if os.name == "nt" else sys.stdin.read(1)
 
     def getarrow(self):
         """Returns an arrow-key code after kbhit() has been called. Codes are
@@ -84,25 +79,24 @@ class KBHit:
         Should not be called in the same program as getch().
         """
 
-        if os.name == 'nt':
-            msvcrt.getch() # skip 0xE0
+        if os.name == "nt":
+            msvcrt.getch()  # skip 0xE0
             c = msvcrt.getch()
             vals = [72, 77, 80, 75]
-
         else:
             c = sys.stdin.read(3)[2]
             vals = [65, 67, 66, 68]
 
-        return vals.index(ord(c.decode('utf-8')))
+        return vals.index(ord(c.decode("utf-8")))
 
     def kbhit(self):
         """
         Returns True if keyboard character was hit, False otherwise.
         """
-        if os.name == 'nt':
+        if os.name == "nt":
             return msvcrt.kbhit()
         else:
-            dr,dw,de = select([sys.stdin], [], [], 0)
+            dr = select([sys.stdin], [], [], 0)[0]
             return dr != []
 
 
@@ -111,7 +105,9 @@ class BaseClass:
     Base class for both bank and inspector
     """
 
-    def _log(self, message, stdio: bool = True, in_file: bool = False, file_mode: str = "a"):
+    def _log(
+        self, message, stdio: bool = True, in_file: bool = False, file_mode: str = "a"
+    ):
 
         prefix = datetime.now().strftime("%Y-%m-%d:%H:%M:%S ")
 
@@ -129,7 +125,6 @@ class BaseClass:
             if branch["id"] == bid:
                 return i
 
-
     def get_config(self, path=None):
         """
         Gets and prepares configurations from yaml config file
@@ -138,9 +133,9 @@ class BaseClass:
         if path is None:
             path = Constants.config_file
 
-        with open(path, 'r') as yaml_file:
+        with open(path, "r") as yaml_file:
             self.config = yaml.load(yaml_file, Loader=yaml.FullLoader)
 
-        self.brnch_confs = self.config['branches']
-        self.bank_confs = self.config['bank']
-        self.inspctr_confs = self.config['inspector']
+        self.brnch_confs = self.config["branches"]
+        self.bank_confs = self.config["bank"]
+        self.inspctr_confs = self.config["inspector"]
