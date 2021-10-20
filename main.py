@@ -2,20 +2,35 @@ import argparse
 import shutil
 
 from bank import Bank
-from inspector import Inspector
 from commons import Constants
+from inspector import Inspector
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     # create and parse arguments
     ap = argparse.ArgumentParser()
 
-    ap.add_argument("-b", "--bank", required=False, action='store_true',
-                    help="Use this option to run an instance of Bank (a branch).")
-    ap.add_argument("-i", "--inspector", required=False, action='store_true',
-                    help="Use this option to run the inspector")
-    ap.add_argument("-c", "--clear", required=False, action='store_true',
-                    help="Clear the branches information file.")
+    ap.add_argument(
+        "-b",
+        "--bank",
+        required=False,
+        action="store_true",
+        help="Use this option to run an instance of Bank (a branch).",
+    )
+    ap.add_argument(
+        "-i",
+        "--inspector",
+        required=False,
+        action="store_true",
+        help="Use this option to run the inspector",
+    )
+    ap.add_argument(
+        "-c",
+        "--clear",
+        required=False,
+        action="store_true",
+        help="Clear the branches information file.",
+    )
 
     args = ap.parse_args()
 

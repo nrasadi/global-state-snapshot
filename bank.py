@@ -1,13 +1,13 @@
-import pickle
-import socket
-import random
 import json
+import pickle
+import random
+import socket
 from datetime import datetime
-from time import sleep
 from queue import Queue
-from threading import Thread, Lock
+from threading import Lock, Thread
+from time import sleep
 
-from commons import Constants, KBHit, BaseClass
+from commons import BaseClass, Constants, KBHit
 
 
 class Bank(BaseClass):
@@ -21,8 +21,9 @@ class Bank(BaseClass):
 
     # Class Methods
     @classmethod
-    def load_class_vars(cls, ):
-
+    def load_class_vars(
+        cls,
+    ):
 
         while True:
             try:
@@ -32,28 +33,23 @@ class Bank(BaseClass):
                     return
 
                 with open(Bank.bank_file, "r") as f:
-                    temp = f.read()
-                bank_vars = json.loads(temp)
+                    bank_vars = json.load(f)
 
                 Bank.next_id = len(bank_vars["branch_details"])
                 Bank.branches_public_details = bank_vars["branch_details"]
                 return
-            except:
+            except Exception:
                 continue
 
     @classmethod
-    def save_class_vars(cls, ):
-
+    def save_class_vars(
+        cls,
+    ):
         with open(Bank.bank_file, "w") as f:
-            json.dump({"branch_details":Bank.branches_public_details}, f)
-
+            json.dump({"branch_details": Bank.branches_public_details}, f)
 
     def __init__(
-        self,
-        id=None,
-        balance=1_000_000,
-        address='localhost',
-        max_number_of_send=1_000
+        self, id=None, balance=1_000_000, address="localhost", max_number_of_send=1_000
     ):
 
         self._log("Initiating ...")
@@ -70,24 +66,24 @@ class Bank(BaseClass):
         self.id = Bank.next_id
         Bank.next_id += 1
 
-        self.balance = self.bank_confs['initial_balance']
+        self.balance = self.bank_confs["initial_balance"]
         if self.balance is None:
             self.balance = balance
 
-        self.max_n_send = self.bank_confs['max_n_send']
+        self.max_n_send = self.bank_confs["max_n_send"]
         if self.max_n_send is None:
             self.max_n_send = max_number_of_send
 
         Bank.consts.dir_logs.mkdir() if not Bank.consts.dir_logs.is_dir() else None
         self.log_database = Bank.consts.dir_logs / f"branch_{self.id}.log"
 
-        self._log(f"Branch {self.id} started working.", in_file=True, file_mode='w')
+        self._log(f"Branch {self.id} started working.", in_file=True, file_mode="w")
 
         self.do_snapshot = -1
         self.local_snapshots = []
         self.got_marker = False
 
-        self.address = self.brnch_confs[self.id]['address']
+        self.address = self.brnch_confs[self.id]["address"]
         if self.address is None:
             self.address = address
 
@@ -97,9 +93,10 @@ class Bank(BaseClass):
         self._init_other_branches()
 
         self.inspector = {
-            "port": self.inspctr_confs['port_base_out'] + self.id,
-            "address": self.inspctr_confs['address'],
-            "conn": None}
+            "port": self.inspctr_confs["port_base_out"] + self.id,
+            "address": self.inspctr_confs["address"],
+            "conn": None,
+        }
 
         self._init_inspector()
 
@@ -128,23 +125,25 @@ class Bank(BaseClass):
             if len(Bank.branches_public_details) == self.n_branches:
                 self._log(
                     f"All {self.n_branches} branches are open now. "
-                     "Resuming the process ...")
+                    "Resuming the process ..."
+                )
                 break
 
         for i in range(self.n_branches):
             if i != self.id:
-                port =  self.brnch_confs[i]['port_base_in'] + self.id + i * 10
-                port_out = self.brnch_confs[self.id]['port_base_out'] \
-                         + self.id  * 10 + i
-                self.branches.append({
-                    "id": Bank.branches_public_details[i]["id"],
-                    "port": port_out,
-                    "address": Bank.branches_public_details[i]["address"],
-                    "in_sock": socket.socket(socket.AF_INET, socket.SOCK_STREAM),
-                    "in_conn": None,
-                    "out_conn": socket.socket(socket.AF_INET, socket.SOCK_STREAM),
-                    "last_message": Queue()
-                })
+                port = self.brnch_confs[i]["port_base_in"] + self.id + i * 10
+                port_out = self.brnch_confs[self.id]["port_base_out"] + self.id * 10 + i
+                self.branches.append(
+                    {
+                        "id": Bank.branches_public_details[i]["id"],
+                        "port": port_out,
+                        "address": Bank.branches_public_details[i]["address"],
+                        "in_sock": socket.socket(socket.AF_INET, socket.SOCK_STREAM),
+                        "in_conn": None,
+                        "out_conn": socket.socket(socket.AF_INET, socket.SOCK_STREAM),
+                        "last_message": Queue(),
+                    }
+                )
                 self.branches[-1]["in_sock"].bind((self.address, port))
                 self.branches[-1]["in_sock"].listen(1)
 
@@ -166,7 +165,7 @@ class Bank(BaseClass):
 
         self._log("Connected to Inspector.")
 
-    def transfer(self, amount: int, receiver, show_error: bool=False):
+    def transfer(self, amount: int, receiver, show_error: bool = False):
         """
         Transfers amount to the receiver.
         :param amount: amount in integer.
@@ -178,9 +177,11 @@ class Bank(BaseClass):
         """
         # TODO: Write something like the below:
         if amount > self.balance:
-            message = (f"Transfer Failed: "
-                        f"The amount of money needed to transfer "
-                        "is more than assets of the branch #{self.id}.")
+            message = (
+                "Transfer Failed: "
+                "The amount of money needed to transfer "
+                "is more than assets of the branch #{self.id}."
+            )
 
             if show_error:
                 self._log(message, in_file=True)
@@ -188,7 +189,7 @@ class Bank(BaseClass):
             # raise message
             return {"status": False}
 
-        message = {"subject":"transfer", "amount": amount}
+        message = {"subject": "transfer", "amount": amount}
         result = self._send_message(receiver["out_conn"], message)
 
         # check whether status == True or not
@@ -196,23 +197,22 @@ class Bank(BaseClass):
             self.balance -= amount
 
         time_format = "%Y-%m-%d:%H:%M:%S"
-        c_sign = self.bank_confs['currency']['symbol']
-        c_unit = self.bank_confs['currency']['unit']
-        s_place = self.bank_confs['currency']['placement']
+        c_sign = self.bank_confs["currency"]["symbol"]
+        c_unit = self.bank_confs["currency"]["unit"]
+        s_place = self.bank_confs["currency"]["placement"]
         sign_before = f'{c_sign if s_place == "before" else ""}'
         sign_after = f'{c_sign if s_place == "after" else ""}'
-        merged_unit_sign_after = c_unit + ' ' + sign_after
+        merged_unit_sign_after = c_unit + " " + sign_after
         self._log(
-            f'Branch {self.id}: '
-            f'{sign_before}'
-            f'{amount}'
+            f"Branch {self.id}: " f"{sign_before}" f"{amount}"
             # f'{c_unit:<4} '
             # f'{sign_after} '
-            f'{merged_unit_sign_after:<6}'
-            f'Transferred TO the branch '
+            f"{merged_unit_sign_after:<6}"
+            f"Transferred TO the branch "
             f'{receiver["id"]:>2}. '
             f'(send_time:{result["send_time"].strftime(time_format)})',
-            in_file=True)
+            in_file=True,
+        )
 
         return result
 
@@ -230,13 +230,13 @@ class Bank(BaseClass):
             message = pickle.dumps(message)
             conn.sendall(message)
             status = True
-        except:
+        except Exception:
             status = False
 
         self.lock.release()
 
         return {
-            "status": status, # True (succeeded) or False (failed)
+            "status": status,  # True (succeeded) or False (failed)
             "send_time": send_time,
         }
 
@@ -255,11 +255,21 @@ class Bank(BaseClass):
         send = []
         for branch in self.branches:
 
-            send.append(Thread(target=self._do_common_transfer, args=(branch["id"], ),
-                               name=f"common_transfer_to{branch['id']}_th"))
+            send.append(
+                Thread(
+                    target=self._do_common_transfer,
+                    args=(branch["id"],),
+                    name=f"common_transfer_to{branch['id']}_th",
+                )
+            )
 
-            receive.append(Thread(target=self._do_common_receive, args=(branch["id"],),
-                                  name=f"common_receive_from{branch['id']}_th"))
+            receive.append(
+                Thread(
+                    target=self._do_common_receive,
+                    args=(branch["id"],),
+                    name=f"common_receive_from{branch['id']}_th",
+                )
+            )
         for th in zip(receive, send):
             th[0].start()
             th[1].start()
@@ -290,19 +300,20 @@ class Bank(BaseClass):
         receiver = self.branches[receiver_id]
 
         max_n_send = self.max_n_send
-        p_trnsction = self.bank_confs['transaction']['p']
-        min_amount = self.bank_confs['transaction']['min']
-        max_amount = self.bank_confs['transaction']['max']
+        p_trnsction = self.bank_confs["transaction"]["p"]
+        min_amount = self.bank_confs["transaction"]["min"]
+        max_amount = self.bank_confs["transaction"]["max"]
         while True:
             if max_n_send == 0:
                 self._log(
                     f"Reached to the maximum number of sends "
                     f"({self.max_n_send} messages per branch)",
-                    in_file=True)
+                    in_file=True,
+                )
 
                 return
 
-            sleep(self.bank_confs['time_step'])
+            sleep(self.bank_confs["time_step"])
 
             if random.random() <= p_trnsction:
                 amount = random.randint(min_amount, max_amount)
@@ -337,15 +348,17 @@ class Bank(BaseClass):
         :return:
         """
 
-        recv_messages_th = Thread(target=self._recv_messages, args=(sender_id,), name="recv_messages_th")
+        recv_messages_th = Thread(
+            target=self._recv_messages, args=(sender_id,), name="recv_messages_th"
+        )
         recv_messages_th.start()
 
         sender_index = self._id_to_index(sender_id)
         sender = self.branches[sender_index]
 
-        min_delay = self.brnch_confs[self.id]['delay']['min']
-        max_delay = self.brnch_confs[self.id]['delay']['max']
-        time_step = self.bank_confs['time_step']
+        min_delay = self.brnch_confs[self.id]["delay"]["min"]
+        max_delay = self.brnch_confs[self.id]["delay"]["max"]
+        time_step = self.bank_confs["time_step"]
 
         while True:
             if not self.recv_queue[sender_index].empty():
@@ -366,16 +379,23 @@ class Bank(BaseClass):
                     "amount": message["amount"],
                     "sender_id": sender["id"],
                     "receiver_id": self.id,
-                    "receive_time": recv_time
+                    "receive_time": recv_time,
                 }
 
                 self._send_message(conn=self.inspector["conn"], message=message_to_insp)
 
             elif message["subject"].lower() == "snapshot":
-                self._log(f"Branch {sender_id} has just sent its local snapshot.", in_file=True)
+                self._log(
+                    f"Branch {sender_id} has just sent its local snapshot.",
+                    in_file=True,
+                )
                 self.local_snapshots.append(message)
 
-            last_message = {"recv_time": recv_time, "amount": amount, "subject": message["subject"]}
+            last_message = {
+                "recv_time": recv_time,
+                "amount": amount,
+                "subject": message["subject"],
+            }
             if "initiator" in message.keys():
                 last_message["initiator"] = message["initiator"]
 
@@ -390,12 +410,15 @@ class Bank(BaseClass):
             message = pickle.loads(pickled_data)
             self.recv_queue[sender_index].put(message)
 
-
     def snapshot_process(self):
 
         while True:
-            init_snapshot_th = Thread(target=self._init_snapshot, name="init_snapshot_th")
-            check_for_marker_th = Thread(target=self._check_for_marker, name="check_for_marker_th")
+            init_snapshot_th = Thread(
+                target=self._init_snapshot, name="init_snapshot_th"
+            )
+            check_for_marker_th = Thread(
+                target=self._check_for_marker, name="check_for_marker_th"
+            )
             init_snapshot_th.start()
             check_for_marker_th.start()
 
@@ -409,9 +432,7 @@ class Bank(BaseClass):
     def _init_snapshot(self):
 
         kb = KBHit()
-        self._log(
-        "TO GET A SNAPSHOT -> Enter 's' \n"
-        )
+        self._log("TO GET A SNAPSHOT -> Enter 's' \n")
         while True:
             if kb.kbhit():
                 character = kb.getch().lower()
@@ -426,7 +447,6 @@ class Bank(BaseClass):
                 elif "q" in character:
                     self._log("Initiating a snapshot.", in_file=True)
                     kb.set_normal_term()
-
 
             if self.got_marker:
                 kb.set_normal_term()
@@ -447,7 +467,7 @@ class Bank(BaseClass):
             "id": self.id,
             "subject": "snapshot",
             "balance": local,
-            "on_the_fly": on_the_fly
+            "on_the_fly": on_the_fly,
         }
 
         while True:
@@ -466,17 +486,19 @@ class Bank(BaseClass):
 
         message = {
             "subject": "global_snapshot",
-            "local_snapshots": [{"id": local["id"],
-                                 "balance": local["balance"],
-                                 "in_channels": local["on_the_fly"]}
-                                for local in self.local_snapshots],
+            "local_snapshots": [
+                {
+                    "id": local["id"],
+                    "balance": local["balance"],
+                    "in_channels": local["on_the_fly"],
+                }
+                for local in self.local_snapshots
+            ],
             "request_time": request_time,
-            "preparation_time": preparation_time
+            "preparation_time": preparation_time,
         }
 
         self._send_message(conn=self.inspector["conn"], message=message)
-
-
 
     def _check_for_marker(self):
 
@@ -497,10 +519,15 @@ class Bank(BaseClass):
 
             branch_idx = (branch_idx + 1) % (self.n_branches - 1)
 
-        self._log(f"Branch {self.branches[sender_index]['id']} has sent a snapshot request. "
-                  f"(Initiator: Branch {last_message['initiator']})", in_file=True)
+        self._log(
+            f"Branch {self.branches[sender_index]['id']} has sent a snapshot request. "
+            f"(Initiator: Branch {last_message['initiator']})",
+            in_file=True,
+        )
 
-        local, channels = self._do_snappy_things(exclude_index=sender_index, initiator=last_message['initiator'])
+        local, channels = self._do_snappy_things(
+            exclude_index=sender_index, initiator=last_message["initiator"]
+        )
 
         try:
             on_the_fly = sum(channels)
@@ -513,18 +540,20 @@ class Bank(BaseClass):
             "id": self.id,
             "subject": "snapshot",
             "balance": local,
-            "on_the_fly": on_the_fly
+            "on_the_fly": on_the_fly,
         }
         intitator_idx = self._id_to_index(last_message["initiator"])
-        self._send_message(conn=self.branches[intitator_idx]["out_conn"], message=local_snapshot)
+        self._send_message(
+            conn=self.branches[intitator_idx]["out_conn"], message=local_snapshot
+        )
 
         self.got_marker = True
         return 1
 
-    def _do_snappy_things(self, initiator, exclude_index=None ):
+    def _do_snappy_things(self, initiator, exclude_index=None):
 
         own_state = self.balance
-        message = {"subject": "marker", "initiator": initiator }
+        message = {"subject": "marker", "initiator": initiator}
 
         que = Queue()
         threads = []
@@ -534,9 +563,12 @@ class Bank(BaseClass):
                 self._log(f"Sent marker TO {branch['id']}", in_file=True)
 
             if branch_idx != exclude_index:
-                target = lambda q, arg1: q.put(self._inspect_channel(arg1))
-                threads.append(Thread(target=target,
-                                      args=(que, branch["id"])))
+                threads.append(
+                    Thread(
+                        target=lambda q, arg1: q.put(self._inspect_channel(arg1)),
+                        args=(que, branch["id"]),
+                    )
+                )
                 threads[-1].start()
 
         for th in threads:
@@ -572,12 +604,16 @@ class Bank(BaseClass):
         threads = []
         for branch in self.branches:
 
-            threads.append(Thread(target=self._connect_to_branch, args=(branch["id"], "client")))
+            threads.append(
+                Thread(target=self._connect_to_branch, args=(branch["id"], "client"))
+            )
             threads[-1].start()
 
             sleep(0.5)
 
-            threads.append(Thread(target=self._connect_to_branch, args=(branch["id"], "server")))
+            threads.append(
+                Thread(target=self._connect_to_branch, args=(branch["id"], "server"))
+            )
             threads[-1].start()
 
         for th in threads:
@@ -585,8 +621,7 @@ class Bank(BaseClass):
 
         threads = []
         threads.append(Thread(target=self.do_common, name="do_common_th"))
-        threads.append(
-            Thread(target=self.snapshot_process, name="snapshot_process_th"))
+        threads.append(Thread(target=self.snapshot_process, name="snapshot_process_th"))
 
         for th in threads:
             th.start()
@@ -605,10 +640,16 @@ class Bank(BaseClass):
         bid = self._id_to_index(bid)
 
         if mode == "server":
-            self.branches[bid]["in_conn"], self.branches[bid]["address"] = self.branches[bid]["in_sock"].accept()
+            (
+                self.branches[bid]["in_conn"],
+                self.branches[bid]["address"],
+            ) = self.branches[bid]["in_sock"].accept()
 
         elif mode == "client":
             while True:
-                address, port = self.branches[bid]["address"], self.branches[bid]["port"]
+                address, port = (
+                    self.branches[bid]["address"],
+                    self.branches[bid]["port"],
+                )
                 self.branches[bid]["out_conn"].connect((address, port))
                 break
