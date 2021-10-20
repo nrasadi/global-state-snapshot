@@ -19,12 +19,8 @@ class Bank(BaseClass):
     branches_public_details = []
     next_id = 0
 
-    # Class Methods
-    @classmethod
-    def load_class_vars(
-        cls,
-    ):
-
+    @staticmethod
+    def load_class_vars():
         while True:
             try:
                 if not Bank.bank_file.is_file():
@@ -41,10 +37,8 @@ class Bank(BaseClass):
             except Exception:
                 continue
 
-    @classmethod
-    def save_class_vars(
-        cls,
-    ):
+    @staticmethod
+    def save_class_vars():
         with open(Bank.bank_file, "w") as f:
             json.dump({"branch_details": Bank.branches_public_details}, f)
 
