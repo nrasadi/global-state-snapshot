@@ -221,17 +221,16 @@ class Bank(BaseClass):
         :param message: it can be everything
         :return: a dictionary with these keys: [status: Bool, send_time: datetime object]
         """
-        self.lock.acquire()
+
         send_time = datetime.now()
 
-        try:
-            message = pickle.dumps(message)
-            conn.sendall(message)
-            status = True
-        except Exception:
-            status = False
-
-        self.lock.release()
+        with self.lock:
+            try:
+                message = pickle.dumps(message)
+                conn.sendall(message)
+                status = True
+            except Exception:
+                status = False
 
         return {
             "status": status,  # True (succeeded) or False (failed)

@@ -1,7 +1,6 @@
 import pickle
 import socket
-import threading
-from threading import Thread
+from threading import Lock, Thread
 
 from bank import Bank
 from commons import BaseClass, Constants
@@ -21,7 +20,7 @@ class Inspector(BaseClass):
         self.branches = []
         self.received_messages = []
         self.sent_messages = []
-        self.lock = threading.Lock()
+        self.lock = Lock()
         self.n_global_snapshots = 0
 
         self.log_database = Constants.dir_logs / self.inspctr_confs["log_file"]
@@ -168,23 +167,21 @@ class Inspector(BaseClass):
 
     def find_transfer_message(self, message, send_msg: bool = False, remove=True):
 
-        self.lock.acquire()
-
         corresponding_message = False
         query_list = self.sent_messages if send_msg else self.received_messages
 
-        for i, prev_message in enumerate(query_list):
+        with self.lock:
+            for i, prev_message in enumerate(query_list):
+                if (
+                    prev_message["amount"] == message["amount"]
+                    and prev_message["sender_id"] == message["sender_id"]
+                    and prev_message["receiver_id"] == message["receiver_id"]
+                ):
+                    corresponding_message = (
+                        query_list.pop(i) if remove else query_list[i]
+                    )
+                    break
 
-            if (
-                prev_message["amount"] == message["amount"]
-                and prev_message["sender_id"] == message["sender_id"]
-                and prev_message["receiver_id"] == message["receiver_id"]
-            ):
-
-                corresponding_message = query_list.pop(i) if remove else query_list[i]
-                break
-
-        self.lock.release()
         return corresponding_message
 
     def run(self):
