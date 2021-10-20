@@ -1,6 +1,8 @@
+from concurrent.futures import ThreadPoolExecutor
+
 import pickle
 import socket
-from threading import Lock, Thread
+from threading import Lock
 
 from bank import Bank
 from commons import BaseClass, Constants
@@ -186,9 +188,7 @@ class Inspector(BaseClass):
 
     def run(self):
 
-        threads = []
-        for i in range(self.n_branches):
-            threads.append(Thread(target=self.get_messages, args=(i,)))
-            threads[-1].start()
-        for i in range(self.n_branches):
-            threads[i].join()
+        with ThreadPoolExecutor(
+            max_workers=self.n_branches, thread_name_prefix="inspector_run"
+        ) as executor:
+            executor.map(self.get_messages, range(self.n_branches))
