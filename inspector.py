@@ -181,13 +181,8 @@ class Inspector(BaseClass):
                 and prev_message["receiver_id"] == message["receiver_id"]
             ):
 
-                if remove:
-                    corresponding_message = query_list.pop(i)
-                else:
-                    corresponding_message = query_list[i]
-
-                self.lock.release()
-                return corresponding_message
+                corresponding_message = query_list.pop(i) if remove else query_list[i]
+                break
 
         self.lock.release()
         return corresponding_message

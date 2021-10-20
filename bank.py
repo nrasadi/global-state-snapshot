@@ -393,7 +393,7 @@ class Bank(BaseClass):
                 "amount": amount,
                 "subject": message["subject"],
             }
-            if "initiator" in message.keys():
+            if "initiator" in message:
                 last_message["initiator"] = message["initiator"]
 
             self.branches[sender_index]["last_message"].put(last_message)
@@ -635,18 +635,19 @@ class Bank(BaseClass):
         """
 
         bid = self._id_to_index(bid)
+        branch = self.branches[bid]
 
         if mode == "server":
             (
-                self.branches[bid]["in_conn"],
-                self.branches[bid]["address"],
-            ) = self.branches[bid]["in_sock"].accept()
+                branch["in_conn"],
+                branch["address"],
+            ) = branch["in_sock"].accept()
 
         else:  # client
             while True:
                 address, port = (
-                    self.branches[bid]["address"],
-                    self.branches[bid]["port"],
+                    branch["address"],
+                    branch["port"],
                 )
-                self.branches[bid]["out_conn"].connect((address, port))
+                branch["out_conn"].connect((address, port))
                 break
